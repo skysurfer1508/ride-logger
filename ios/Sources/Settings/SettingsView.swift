@@ -3,6 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     let api: APIClient
     @ObservedObject var auth: AuthService
+    @ObservedObject var recorder: RideRecorder
+    @ObservedObject var uploader: RideUploader
+    @AppStorage("keepScreenOn") private var keepScreenOn = true
+    @State private var localRides: [RideRecorder.LocalRide] = []
+    @State private var deleteTarget: RideRecorder.LocalRide?
 
     @StateObject private var me: Loader<MeResponse>
     @StateObject private var server: Loader<SettingsResponse>
@@ -22,9 +27,11 @@ struct SettingsView: View {
         let isError: Bool
     }
 
-    init(api: APIClient, auth: AuthService) {
+    init(api: APIClient, auth: AuthService, recorder: RideRecorder, uploader: RideUploader) {
         self.api = api
         self.auth = auth
+        self.recorder = recorder
+        self.uploader = uploader
         _me = StateObject(wrappedValue: Loader(api: api, path: "me"))
         _server = StateObject(wrappedValue: Loader(api: api, path: "settings"))
     }
@@ -42,6 +49,7 @@ struct SettingsView: View {
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 6))
                     }
                     accountPanel
+                    recordingPanel
                     overlandPanel
                     detectionPanel
                     aboutPanel
@@ -51,9 +59,22 @@ struct SettingsView: View {
             .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Settings")
             .task {
+                refreshLocalRides()
                 await me.loadIfNeeded()
                 await server.loadIfNeeded()
                 fillDetection()
+            }
+            .onChange(of: uploader.unsentPoints) { _, _ in refreshLocalRides() }
+            .onChange(of: recorder.phase) { _, _ in refreshLocalRides() }
+            .confirmationDialog("Remove this ride from the phone?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+                                titleVisibility: .visible) {
+                Button("Remove", role: .destructive) {
+                    if let target = deleteTarget { recorder.deleteLocal(tripId: target.id) }
+                    deleteTarget = nil
+                    refreshLocalRides()
+                }
+            } message: {
+                Text("Anything not uploaded yet is lost for good.")
             }
             .confirmationDialog("Regenerate the upload token?", isPresented: $confirmRegenerate, titleVisibility: .visible) {
                 Button("Regenerate", role: .destructive) { Task { await regenerate() } }
@@ -61,7 +82,14 @@ struct SettingsView: View {
                 Text("The current token stops working. Overland needs the new one before it can upload again.")
             }
             .confirmationDialog("Sign out of RideLog?", isPresented: $confirmSignOut, titleVisibility: .visible) {
-                Button("Sign out", role: .destructive) { Task { await auth.signOut() } }
+                Button("Sign out", role: .destructive) {
+                    uploader.forgetCredentials()
+                    Task { await auth.signOut() }
+                }
+            } message: {
+                Text(uploader.unsentRides > 0
+                     ? "\(uploader.unsentRides) ride(s) haven't finished uploading. They stay on this phone and upload after you sign in again."
+                     : "You can sign in again any time.")
             }
         }
     }
@@ -76,8 +104,58 @@ struct SettingsView: View {
             } else {
                 ProgressView().tint(Theme.accent)
             }
-            Button("Sign out", role: .destructive) { confirmSignOut = true }
+            Button("Sign out", role: .destructive) {
+                if recorder.isRecording {
+                    banner = Banner(text: "Finish the ride you are recording before signing out.", isError: true)
+                } else {
+                    confirmSignOut = true
+                }
+            }
         }
+    }
+
+    private var recordingPanel: some View {
+        Panel(title: "Recording") {
+            Toggle("Keep the screen on while recording", isOn: $keepScreenOn)
+                .tint(Theme.accent)
+                .foregroundStyle(Theme.text)
+            Text("Recording continues with the screen locked. Keeping it on makes the speed easy to read on a mount but uses more battery.")
+                .font(.footnote).foregroundStyle(Theme.muted)
+            UploadStatus(uploader: uploader)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("RIDES ON THIS PHONE").font(Theme.label).tracking(1.2).foregroundStyle(Theme.muted).padding(.top, 6)
+            if localRides.isEmpty {
+                Text("None. Rides are kept here until they have uploaded, then the newest five stay as a backup.")
+                    .font(.footnote).foregroundStyle(Theme.muted)
+            }
+            ForEach(localRides) { ride in
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ride.record.startedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.subheadline).foregroundStyle(Theme.text)
+                        Text(status(of: ride)).font(.caption).foregroundStyle(Theme.muted)
+                    }
+                    Spacer()
+                    if !(recorder.isRecording && !ride.record.isFinished) {
+                        Button(role: .destructive) { deleteTarget = ride } label: { Image(systemName: "trash") }
+                            .accessibilityLabel("Remove this ride from the phone")
+                    }
+                }
+            }
+        }
+    }
+
+    private func status(of ride: RideRecorder.LocalRide) -> String {
+        let record = ride.record
+        if !record.isFinished { return recorder.isRecording ? "Recording now · \(ride.sampleCount) points" : "Cut off · \(ride.sampleCount) points" }
+        if let mine = uploader.credentials?.email, record.ownerEmail != mine { return "Belongs to \(record.ownerEmail). Sign in as them to upload." }
+        if record.markerSent && record.uploadedCount >= ride.sampleCount { return "Uploaded · \(ride.sampleCount) points" }
+        return "Waiting to upload · \(max(0, ride.sampleCount - record.uploadedCount)) of \(ride.sampleCount) points"
+    }
+
+    private func refreshLocalRides() {
+        localRides = recorder.localRides()
     }
 
     private var overlandPanel: some View {

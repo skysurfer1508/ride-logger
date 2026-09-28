@@ -4,13 +4,14 @@ import Foundation
 
 /// The tabs, in order.
 enum AppTab: Int, CaseIterable, Identifiable {
-    case home, rides, overview, settings
+    case home, rides, record, overview, settings
 
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .home: return "Home"
         case .rides: return "Rides"
+        case .record: return "Record"
         case .overview: return "Overview"
         case .settings: return "Settings"
         }
@@ -20,6 +21,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
         switch self {
         case .home: return "gauge.with.dots.needle.bottom.50percent"
         case .rides: return "list.bullet"
+        case .record: return "record.circle"
         case .overview: return "chart.bar.xaxis"
         case .settings: return "slider.horizontal.3"
         }

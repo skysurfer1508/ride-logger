@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.config import settings
 from app.db import get_db
 from conftest import ALICE, BOB, add_token
 
@@ -20,8 +21,11 @@ def doc():
 
 
 @pytest.fixture(autouse=True)
-def alice_token():
+def alice_token(monkeypatch):
     add_token(ALICE["sub"], ALICE["email"], TOKEN)
+    # The fixture's rides are dated 2026-09-28, so as the clock moves on they would count as "quiet for an hour" and the server's stale-trip
+    # sweep would close them mid-test. These tests are about the batches, not the sweep: switch it off here (the sweep has its own tests below).
+    monkeypatch.setattr(settings, "stale_trip_minutes", 10**9)
 
 
 def haversine(a, b):
@@ -164,3 +168,70 @@ def test_malformed_items_are_skipped_not_fatal(anon, doc):
     body["locations"].insert(2, {"type": "Feature", "geometry": {}, "properties": {}})
     assert post(anon, body).json() == {"result": "ok"}
     assert rows("SELECT COUNT(*) c FROM rides")[0]["c"] == 1
+
+
+# ---------------------------------------------- the stale-trip sweep vs. a phone that was offline ---
+
+@pytest.fixture
+def sweep_closes_quiet_trips(monkeypatch):
+    """The fixture's points are long past, so with a near-zero limit the sweep treats any trip that is not finished as quiet for too long."""
+    monkeypatch.setattr(settings, "stale_trip_minutes", 0.0001)
+
+
+def test_points_that_arrive_after_the_sweep_closed_the_ride_are_added_to_it(anon, doc, sweep_closes_quiet_trips):
+    """The phone had no signal for over an hour: the server closed the ride from the points it had, then the phone got a connection back and
+    sent the rest with the trip marker. Before the fix that second upload crashed with a UNIQUE constraint error and the app retried forever."""
+    locations = doc["body"]["locations"]
+    assert post(anon, {"locations": locations[:25]}).status_code == 200
+    (early,) = rows("SELECT * FROM rides")
+    assert early["point_count"] == 25                               # closed early, with what it had
+
+    assert post(anon, {"locations": locations[25:]}).status_code == 200      # the remaining 15 points + the marker
+    (ride,) = rows("SELECT * FROM rides")                            # still exactly one ride, now complete
+    assert ride["id"] == early["id"]
+    assert ride["point_count"] == 40
+    assert ride["duration_s"] == 195
+    assert ride["distance_m"] > early["distance_m"]
+    assert ride["app_reported_distance_m"] == doc["trip"]["distance_m"]
+    assert rows("SELECT COUNT(*) c FROM points WHERE ride_id IS NULL")[0]["c"] == 0
+    assert rows("SELECT COUNT(*) c FROM points WHERE ride_id = ?", ride["id"])[0]["c"] == 40
+
+
+def test_the_completed_ride_matches_one_that_was_never_interrupted(anon, doc, monkeypatch):
+    locations = doc["body"]["locations"]
+    fields = ("distance_m", "duration_s", "avg_speed_mps", "max_speed_mps", "elevation_gain_m", "point_count",
+              "start_time", "end_time", "polyline_simplified", "app_reported_distance_m")
+
+    monkeypatch.setattr(settings, "stale_trip_minutes", 0.0001)      # the sweep closes the ride after the first 25 points
+    post(anon, {"locations": locations[:25]})
+    post(anon, {"locations": locations[25:]})
+    (row,) = rows("SELECT * FROM rides")
+    late = {k: row[k] for k in fields}
+
+    conn = get_db()                                                    # clean slate, then the same ride in one piece, sweep off
+    conn.executescript("DELETE FROM rides; DELETE FROM points;")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(settings, "stale_trip_minutes", 10**9)
+    post(anon, doc["body"])
+    (row,) = rows("SELECT * FROM rides")
+    whole = {k: row[k] for k in fields}
+
+    assert late == whole
+
+
+def test_a_resent_marker_after_a_late_close_still_changes_nothing(anon, doc, sweep_closes_quiet_trips):
+    locations = doc["body"]["locations"]
+    post(anon, {"locations": locations[:25]})
+    post(anon, {"locations": locations[25:]})
+    before = tuple(rows("SELECT * FROM rides")[0])
+    assert post(anon, {"locations": locations[25:]}).status_code == 200
+    assert tuple(rows("SELECT * FROM rides")[0]) == before
+    assert rows("SELECT COUNT(*) c FROM points")[0]["c"] == 40
+
+
+def test_a_trip_the_sweep_closed_and_that_never_got_more_points_is_left_alone(anon, doc, sweep_closes_quiet_trips):
+    post(anon, {"locations": doc["body"]["locations"][:25]})
+    post(anon, {"locations": []})                                    # any later ingest runs the sweep again
+    (ride,) = rows("SELECT * FROM rides")
+    assert ride["point_count"] == 25

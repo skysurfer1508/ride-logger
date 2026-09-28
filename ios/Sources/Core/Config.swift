@@ -8,6 +8,8 @@ enum Config {
     static let callbackScheme = "ridelogger"
     /// The website's session cookie (app/main.py session_cookie).
     static let sessionCookieName = "ride_logger_session"
+    /// Where the recorder uploads (app/routers/ingest.py), the same endpoint Overland uses.
+    static let ingestPath = "/api/ingest"
     /// Required by the server on every request that changes something (app/auth.py require_api_client).
     static let clientHeaderName = "X-RideLog-Client"
     static let clientHeaderValue = "1"
