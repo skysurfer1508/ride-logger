@@ -1,0 +1,15 @@
+[Unit]
+Description=Ride Logger FastAPI app
+After=network.target
+
+[Service]
+Type=simple
+User=skysurfer1508
+WorkingDirectory=/home/skysurfer1508/ride-logger
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/skysurfer1508/ride-logger/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8090
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

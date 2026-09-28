@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+{% if ok == "token" %}<p class="login-success">Ingest token regenerated -- update it in the Overland app now.</p>{% endif %}
+{% if ok == "detection" %}<p class="login-success">Ride-detection settings updated.</p>{% endif %}
+{% if error %}<p class="login-error">{{ error.split(':', 1)[1] if ':' in error else error }}</p>{% endif %}
+
+<span class="panel-heading section-heading">Overland connection</span>
+<div class="panel settings-panel">
+  <p class="field-hint">This token is yours alone -- data uploaded with it is attributed to your account only.</p>
+  <label class="settings-field">
+    Server URL
+    <input type="text" value="{{ ingest_url }}" readonly onclick="this.select()">
+  </label>
+  <label class="settings-field">
+    Access token
+    <input type="text" value="{{ ingest_token }}" readonly onclick="this.select()">
+  </label>
+  <form method="post" action="/settings/regenerate-token" onsubmit="return confirm('This invalidates the current token. The Overland app will need the new one before it can upload again. Continue?');">
+    <button type="submit" class="danger-btn">Regenerate token</button>
+  </form>
+</div>
+
+<span class="panel-heading section-heading">Ride detection</span>
+<form class="panel settings-panel" method="post" action="/settings/detection">
+  <label class="settings-field">
+    Gap minutes <span class="field-hint">gap between points that starts a new ride when no trip is active</span>
+    <input type="number" name="gap_minutes" step="1" min="1" value="{{ gap_minutes }}">
+  </label>
+  <label class="settings-field">
+    Minimum points <span class="field-hint">fewest points a gap-inferred ride needs to count</span>
+    <input type="number" name="min_points" step="1" min="1" value="{{ min_points }}">
+  </label>
+  <label class="settings-field">
+    Minimum distance (m) <span class="field-hint">shortest gap-inferred ride that counts</span>
+    <input type="number" name="min_distance_m" step="1" min="0" value="{{ min_distance_m }}">
+  </label>
+  <label class="settings-field">
+    Stale trip minutes <span class="field-hint">finalize an in-progress trip if it goes quiet this long</span>
+    <input type="number" name="stale_trip_minutes" step="1" min="1" value="{{ stale_trip_minutes }}">
+  </label>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}

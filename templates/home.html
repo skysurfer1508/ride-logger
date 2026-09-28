@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Home</h1>
+
+<div class="stat-strip">
+  <div class="stat">
+    <span class="stat-value">{{ total_distance_display }}<span class="unit">km</span></span>
+    <span class="stat-label">Total distance</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride_count }}</span>
+    <span class="stat-label">Rides logged</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ avg_speed_display }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Avg speed</span>
+  </div>
+</div>
+
+{% if latest %}
+<a class="latest-ride" href="/rides/{{ latest['id'] }}">
+  <div class="latest-ride-head">
+    <span class="panel-heading">Latest ride</span>
+    <span class="latest-ride-date">{{ latest['start_time'][:16] | replace('T', ' ') }}</span>
+  </div>
+  <div class="latest-ride-figs">
+    <span><b>{{ latest['distance_km'] }}</b> km</span>
+    <span><b>{{ latest['duration_hm'] }}</b></span>
+    <span>avg <b>{{ latest['avg_kmh'] }}</b> km/h</span>
+    <span>max <b>{{ latest['max_kmh'] }}</b> km/h</span>
+  </div>
+</a>
+{% else %}
+<p class="no-data">No rides yet -- once Overland uploads a trip, it'll show up here.</p>
+{% endif %}
+
+<div class="panel">
+  <div class="panel-head">
+    <span class="panel-heading">Everywhere you've ridden</span>
+    <a href="/map" class="panel-link">Full map &rarr;</a>
+  </div>
+  <div id="home-map"></div>
+</div>
+
+<script>
+  var map = initRideMap("home-map", { zoomControl: false, scrollWheelZoom: false });
+  drawRoutes(map, {{ map_data | tojson }}, { fallbackView: [20, 0], fallbackZoom: 2 });
+</script>
+{% endblock %}

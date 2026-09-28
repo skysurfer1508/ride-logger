@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Rides{% endblock %}
+{% block content %}
+<h1>Ride log</h1>
+
+<form class="filter-bar" method="get" action="/rides">
+  <label>
+    From
+    <input type="date" name="date_from" value="{{ filters.date_from }}">
+  </label>
+  <label>
+    To
+    <input type="date" name="date_to" value="{{ filters.date_to }}">
+  </label>
+  <label>
+    Min km
+    <input type="number" name="min_km" step="0.1" min="0" value="{{ filters.min_km }}">
+  </label>
+  <label>
+    Max km
+    <input type="number" name="max_km" step="0.1" min="0" value="{{ filters.max_km }}">
+  </label>
+  <button type="submit">Filter</button>
+  {% if filters.date_from or filters.date_to or filters.min_km or filters.max_km %}
+  <a href="/rides" class="filter-clear">Clear</a>
+  {% endif %}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Dist (km)</th>
+        <th>Time</th>
+        <th>Avg (km/h)</th>
+        <th>Max (km/h)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ride in rides %}
+      <tr>
+        <td><a href="/rides/{{ ride['id'] }}">{{ ride['start_time'][:16] | replace('T', ' ') }}</a></td>
+        <td>{{ ride['distance_km'] }}</td>
+        <td>{{ ride['duration_hm'] }}</td>
+        <td>{{ ride['avg_kmh'] }}</td>
+        <td>{{ ride['max_kmh'] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="no-data">No rides match those filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

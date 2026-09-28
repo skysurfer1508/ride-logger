@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Map{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Map</h1>
+{% if ride_count == 0 %}
+<p class="no-data">No rides yet -- once you've logged some, every route shows up here.</p>
+{% else %}
+<p class="panel-note">{{ ride_count }} ride{{ 's' if ride_count != 1 else '' }} plotted. Overlapping routes glow brighter. Click a route for details.</p>
+<div id="full-map" class="full-map"></div>
+<script>
+  var map = initRideMap("full-map");
+  drawRoutes(map, {{ map_data | tojson }}, { popups: true, opacity: 0.55 });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Ride Logger stale-trip sweep
+After=network.target
+
+[Service]
+Type=oneshot
+User=skysurfer1508
+WorkingDirectory=/home/skysurfer1508/ride-logger
+ExecStart=/home/skysurfer1508/ride-logger/.venv/bin/python -m app.cli sweep

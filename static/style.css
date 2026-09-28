@@ -1,0 +1,683 @@
+/* Instrument Cluster -- a motorcycle's night-mode dash: near-black,
+   one gauge-amber accent, tabular mono readouts, hairline dividers.
+   Deliberately dark only -- a dash doesn't relight for daytime. */
+
+:root {
+  --bg: #0b0c0e;
+  --surface: #101114;
+  --border: #2a2d33;
+  --text: #e8e6e1;
+  --muted: #8b8f96;
+  --accent: #ff9d2e;
+  --accent-strong: #ffb45c;
+  --accent-soft: rgba(255, 157, 46, 0.08);
+  --danger: #e0574a;
+  --success: #5fae6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Barlow", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+.accent {
+  color: var(--accent);
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.logo {
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+
+.nav-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.5rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav-links a:hover,
+.nav-links a.current {
+  color: var(--text);
+}
+
+@media (max-width: 680px) {
+  .nav-toggle {
+    display: block;
+  }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+  }
+  .nav-links.open {
+    display: flex;
+  }
+  .nav-links a {
+    padding: 0.85rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 3rem;
+}
+
+h1 {
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  margin: 0 0 1.25rem;
+  text-wrap: balance;
+}
+
+/* ---- stat strip (overview + ride detail) ---- */
+
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  border: 1px solid var(--border);
+  margin-bottom: 1.75rem;
+}
+
+.stat {
+  padding: 1.25rem 1.5rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-strip .stat:nth-last-child(-n + 1) {
+  border-bottom: none;
+}
+
+.stat-value {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 600;
+}
+
+.stat-value .unit {
+  font-size: 0.8rem;
+  color: var(--accent);
+  margin-left: 0.3rem;
+  font-family: "Barlow Condensed", sans-serif;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- bordered panel (chart, map wrapper) ---- */
+
+.panel {
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  margin: 0 0 1.5rem;
+}
+
+.panel-heading {
+  display: block;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.section-heading {
+  margin: 0 0 0.75rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.9rem;
+}
+
+.panel-link {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.panel-link:hover {
+  color: var(--accent-strong);
+}
+
+.panel-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+/* ---- latest ride card (home) ---- */
+
+.latest-ride {
+  display: block;
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.latest-ride:hover {
+  border-color: var(--accent);
+}
+
+.latest-ride-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+
+.latest-ride-date {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.latest-ride-figs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.latest-ride-figs b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---- filter bar (rides) ---- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.filter-bar input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.45rem 0.5rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  width: 130px;
+}
+
+.filter-clear {
+  align-self: center;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.filter-clear:hover {
+  color: var(--text);
+}
+
+/* ---- personal records (overview) ---- */
+
+.records-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-bottom: 1.75rem;
+}
+
+.record-card {
+  background: var(--bg);
+  padding: 1.1rem 1.25rem;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.record-card:hover {
+  background: var(--accent-soft);
+}
+
+/* ---- calendar heatmap (overview) ---- */
+
+.calendar-heatmap {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 12px;
+  gap: 3px;
+  margin-bottom: 1.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.cal-cell {
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.cal-cell.level-1 {
+  background: rgba(255, 157, 46, 0.25);
+  border-color: rgba(255, 157, 46, 0.25);
+}
+
+.cal-cell.level-2 {
+  background: rgba(255, 157, 46, 0.5);
+  border-color: rgba(255, 157, 46, 0.5);
+}
+
+.cal-cell.level-3 {
+  background: rgba(255, 157, 46, 0.75);
+  border-color: rgba(255, 157, 46, 0.75);
+}
+
+.cal-cell.level-4 {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---- onboarding (welcome) ---- */
+
+.onboarding-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 1px solid var(--border);
+}
+
+.onboarding-steps li {
+  counter-increment: step;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.onboarding-steps li:last-child {
+  border-bottom: none;
+}
+
+.onboarding-steps li::before {
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: var(--accent);
+  color: #1a1207;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.step-label {
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.onboarding-fields {
+  max-width: 480px;
+}
+
+.onboarding-skip {
+  margin-bottom: 1.5rem;
+}
+
+/* ---- settings page ---- */
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 480px;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-field .field-hint {
+  font-family: "Barlow", sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.settings-field input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.55rem 0.6rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.settings-panel button,
+.danger-btn {
+  align-self: flex-start;
+  padding: 0.6rem 1.25rem;
+  border: none;
+  background: var(--accent);
+  color: #1a1207;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.settings-panel button:hover,
+.danger-btn:hover {
+  background: var(--accent-strong);
+}
+
+.danger-btn {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.danger-btn:hover {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+/* ---- ride log table ---- */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+}
+
+th {
+  text-align: left;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover td {
+  background: var(--accent-soft);
+}
+
+td a {
+  text-decoration: none;
+  color: var(--text);
+}
+
+td a:hover {
+  color: var(--accent);
+}
+
+.no-data {
+  font-family: "Barlow", sans-serif;
+  color: var(--muted);
+  padding: 2rem 1rem;
+}
+
+/* ---- forms: login + change password ---- */
+
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2rem;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+main .login-card {
+  margin: 3rem auto 0;
+}
+
+.login-card h1 {
+  font-size: 1.1rem;
+  text-align: center;
+  margin: 0 0 0.5rem;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.login-card input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.55rem 0.6rem;
+  font-family: "Barlow", sans-serif;
+  font-size: 0.95rem;
+}
+
+.login-card button {
+  margin-top: 0.4rem;
+  padding: 0.65rem;
+  border: none;
+  background: var(--accent);
+  color: #1a1207;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.login-card button:hover {
+  background: var(--accent-strong);
+}
+
+.login-card a.button {
+  margin-top: 0.4rem;
+  padding: 0.65rem;
+  border: none;
+  background: var(--accent);
+  color: #1a1207;
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.login-card a.button:hover {
+  background: var(--accent-strong);
+}
+
+.login-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+  text-align: center;
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.login-success {
+  color: var(--success);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* ---- maps (ride detail, full map, home preview) ---- */
+
+.full-map {
+  height: 480px;
+  border: 1px solid var(--border);
+}
+
+#home-map {
+  height: 260px;
+  border: 1px solid var(--border);
+}
+
+.leaflet-control-attribution {
+  background: rgba(11, 12, 14, 0.75) !important;
+  color: var(--muted) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--muted) !important;
+}
+
+.leaflet-control-zoom a {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--border) !important;
+}

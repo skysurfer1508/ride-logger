@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- never commit: secrets, real ride data, build output ---------------------------
+.env
+.env.*
+!.env.example
+data/
+var/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite*
+*.log
+.DS_Store
+
+# --- iOS app (ios/): the Xcode project is generated from ios/project.yml by `xcodegen generate` on the Mac ---
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+ios/*.xcodeproj/
+ios/Signing.local.xcconfig

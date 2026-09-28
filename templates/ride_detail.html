@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Ride {{ ride['id'] }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map.js"></script>
+{% endblock %}
+{% block content %}
+<h1>{{ ride['start_time'][:16] | replace('T', ' ') }}</h1>
+<div class="stat-strip">
+  <div class="stat">
+    <span class="stat-value">{{ ride['distance_km'] }}<span class="unit">km</span></span>
+    <span class="stat-label">Distance</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride['duration_hm'] }}</span>
+    <span class="stat-label">Duration</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride['avg_kmh'] }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Avg speed</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride['max_kmh'] }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Max speed</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ "%.0f"|format(ride['elevation_gain_m']) }}<span class="unit">m</span></span>
+    <span class="stat-label">Elevation gain</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride['point_count'] }}</span>
+    <span class="stat-label">{{ ride['source'] }}</span>
+  </div>
+</div>
+<div id="map" class="full-map"></div>
+<script>
+  var map = initRideMap("map");
+  drawRoutes(map, [{ id: {{ ride['id'] }}, polyline: {{ polyline | tojson }} }], { fallbackView: [0, 0], fallbackZoom: 13 });
+</script>
+{% endblock %}

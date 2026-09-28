@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+<div class="stat-strip">
+  <div class="stat">
+    <span class="stat-value">{{ total_distance_display }}<span class="unit">km</span></span>
+    <span class="stat-label">Total distance</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ ride_count }}</span>
+    <span class="stat-label">Rides logged</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ avg_speed_display }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Avg speed</span>
+  </div>
+  <div class="stat">
+    <span class="stat-value">{{ longest_ride_display }}<span class="unit">km</span></span>
+    <span class="stat-label">Longest ride</span>
+  </div>
+</div>
+
+<div class="panel">
+  <span class="panel-heading">Distance / week</span>
+  <canvas id="weeklyChart" height="90"></canvas>
+</div>
+
+{% if records.longest %}
+<span class="panel-heading section-heading">Personal records</span>
+<div class="records-grid">
+  <a class="record-card" href="/rides/{{ records.longest['id'] }}">
+    <span class="stat-value">{{ records.longest['distance_km'] }}<span class="unit">km</span></span>
+    <span class="stat-label">Longest ride</span>
+  </a>
+  <a class="record-card" href="/rides/{{ records.fastest_avg['id'] }}">
+    <span class="stat-value">{{ records.fastest_avg['avg_kmh'] }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Best avg speed</span>
+  </a>
+  <a class="record-card" href="/rides/{{ records.fastest_top['id'] }}">
+    <span class="stat-value">{{ records.fastest_top['max_kmh'] }}<span class="unit">km/h</span></span>
+    <span class="stat-label">Top speed</span>
+  </a>
+  <a class="record-card" href="/rides/{{ records.most_climb['id'] }}">
+    <span class="stat-value">{{ "%.0f"|format(records.most_climb['elevation_gain_m']) }}<span class="unit">m</span></span>
+    <span class="stat-label">Most elevation</span>
+  </a>
+  <a class="record-card" href="/rides/{{ records.longest_time['id'] }}">
+    <span class="stat-value">{{ records.longest_time['duration_hm'] }}</span>
+    <span class="stat-label">Longest duration</span>
+  </a>
+</div>
+{% endif %}
+
+<span class="panel-heading section-heading">Last 90 days</span>
+<div class="calendar-heatmap">
+  {% for cell in calendar %}
+  <span class="cal-cell level-{{ cell.level }}" title="{{ cell.date }}: {{ cell.km }} km"></span>
+  {% endfor %}
+</div>
+
+<script>
+  const styles = getComputedStyle(document.documentElement);
+  const muted = styles.getPropertyValue('--muted').trim();
+  const accent = styles.getPropertyValue('--accent').trim();
+  const border = styles.getPropertyValue('--border').trim();
+  const monoFont = { family: 'IBM Plex Mono' };
+
+  new Chart(document.getElementById('weeklyChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ weekly_labels | tojson }},
+      datasets: [{
+        label: 'Distance (km)',
+        data: {{ weekly_distances | tojson }},
+        backgroundColor: accent,
+        borderRadius: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: muted, font: monoFont }, grid: { color: border } },
+        y: { beginAtZero: true, ticks: { color: muted, font: monoFont }, grid: { color: border } }
+      }
+    }
+  });
+</script>
+{% endblock %}

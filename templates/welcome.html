@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<h1>Welcome{{ ", " + name if name else "" }}</h1>
+<p class="panel-note">This is where your motorbike rides will show up once your phone starts sending them. Get connected in three steps.</p>
+
+<ol class="onboarding-steps">
+  <li>
+    <span class="step-label">Install Overland</span>
+    <span class="field-hint">The free, open-source GPS logger for iOS. Search "Overland" on the App Store.</span>
+  </li>
+  <li>
+    <span class="step-label">Paste these into Overland's settings</span>
+    <div class="settings-panel onboarding-fields">
+      <label class="settings-field">
+        Server URL
+        <input type="text" value="{{ ingest_url }}" readonly onclick="this.select()">
+      </label>
+      <label class="settings-field">
+        Access token
+        <input type="text" value="{{ ingest_token }}" readonly onclick="this.select()">
+      </label>
+    </div>
+    <span class="field-hint">This token is yours alone -- you can always find it again, or regenerate it, on the Settings page.</span>
+  </li>
+  <li>
+    <span class="step-label">Ride</span>
+    <span class="field-hint">Tap Start in Overland before you head out, Stop when you're done. Your ride shows up here automatically.</span>
+  </li>
+</ol>
+
+<div class="onboarding-skip">
+  <a href="/" class="panel-link">Skip to my dashboard &rarr;</a>
+</div>
+{% endblock %}

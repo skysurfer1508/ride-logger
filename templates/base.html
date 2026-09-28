@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Ride Logger{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav>
+    <a href="/" class="logo">RIDE<span class="accent">LOG</span></a>
+    <button class="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false">&#9776;</button>
+    <div class="nav-links">
+      <a href="/" class="{{ 'current' if request.url.path == '/' else '' }}">Home</a>
+      <a href="/rides" class="{{ 'current' if request.url.path.startswith('/rides') else '' }}">Rides</a>
+      <a href="/overview" class="{{ 'current' if request.url.path == '/overview' else '' }}">Overview</a>
+      <a href="/map" class="{{ 'current' if request.url.path == '/map' else '' }}">Map</a>
+      <a href="/settings" class="{{ 'current' if request.url.path == '/settings' else '' }}">Settings</a>
+      <a href="/logout">Log out</a>
+    </div>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    var navToggle = document.querySelector(".nav-toggle");
+    var navLinks = document.querySelector(".nav-links");
+    if (navToggle) {
+      navToggle.addEventListener("click", function () {
+        var open = navLinks.classList.toggle("open");
+        navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

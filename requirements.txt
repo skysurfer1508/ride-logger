@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+jinja2
+itsdangerous
+python-multipart
+authlib
+httpx
