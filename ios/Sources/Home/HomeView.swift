@@ -91,5 +91,8 @@ struct AllRidesMapView: View {
         .navigationTitle("All rides")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loader.loadIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: .ridesChanged)) { _ in
+            Task { await loader.refresh() }
+        }
     }
 }

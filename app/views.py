@@ -140,6 +140,26 @@ def get_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> tuple[di
     return ride_view(ride), json.loads(ride["polyline_simplified"])
 
 
+def delete_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> bool:
+    """Removes one of the owner's rides together with all of its GPS points. False (and nothing touched) if it isn't theirs or doesn't exist.
+
+    The points go too, not just the ride row: points left behind with no ride would be turned into a ride again by the gap-based detection
+    (a ride without a trip) or by the stale-trip sweep (a ride with one), so the ride would come back on the next upload.
+    """
+    ride = conn.execute(
+        "SELECT id, trip_id FROM rides WHERE id = ? AND owner_sub = ?", (ride_id, owner_sub)
+    ).fetchone()
+    if not ride:
+        return False
+    conn.execute(
+        "DELETE FROM points WHERE owner_sub = ? AND (ride_id = ? OR (trip_id IS NOT NULL AND trip_id = ?))",
+        (owner_sub, ride["id"], ride["trip_id"]),
+    )
+    conn.execute("DELETE FROM rides WHERE id = ? AND owner_sub = ?", (ride["id"], owner_sub))
+    conn.commit()
+    return True
+
+
 # ---------------------------------------------------------------- overview --
 
 def personal_records(conn: sqlite3.Connection, owner_sub: str) -> dict:

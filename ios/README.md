@@ -41,6 +41,22 @@ Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each r
 
 Your rides stay on the phone until they have uploaded; the newest five uploaded ones are kept as a backup (Settings > Recording lists them).
 
+## Live speed on the Lock Screen and in the Dynamic Island
+
+While a ride is recording, RideLog shows a Live Activity: on the **Lock Screen** a banner with the speed, distance, a running timer and your top
+speed, and on iPhones with a **Dynamic Island** the speed and distance in the pill (tap or long-press it for the expanded view with the timer and top
+speed). The timer is drawn by iOS itself; speed and distance are refreshed every few seconds. If the app stops updating (it crashed or was killed) the
+banner shows dashes instead of a frozen speed, and it is removed the next time you open the app. Ending the ride removes it.
+
+It needs Live Activities to be on (iPhone Settings > RideLog > Live Activities; Settings > Recording in the app says whether they are). Recording works
+exactly the same without it. It runs in its own extension target (`RideLogWidgets`); if that target ever breaks the build, `project.yml` says what to delete.
+
+## Deleting rides
+
+Rides > swipe a ride to the left > **Delete**, or open a ride and tap the trash icon. Both ask first. Deleting removes the ride **and its GPS points** from
+your server (`DELETE /api/v1/rides/{id}`), it can't be undone, and only your own rides can be deleted. If the ride was recorded on this phone, a backup copy of
+the newest few stays in Settings > Recording > Rides on this phone until you remove it there. The website has no delete button; this is app-only.
+
 ## Switching off Overland
 
 Overland and RideLog upload to the same place, so they can run side by side. Once a couple of RideLog rides look right on the website
@@ -65,7 +81,20 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 8. Settings > Recording > Rides on this phone lists the ride as "Uploaded".
 9. Battery: note the battery % before and after an hour of riding with the screen locked, and tell Claude what you see.
 
+**Live Activity**
+1. Start a ride and lock the phone: the banner appears on the Lock Screen with speed, distance, timer and top speed, and the speed changes as you move.
+2. Go to the Home Screen or another app: on an iPhone with a Dynamic Island the speed shows on the left of the pill and the distance on the right. Long-press
+   it for the expanded view. Stand still for a few seconds: the speed goes to 0.
+3. Stop the ride: the banner and the pill disappear.
+4. Start a ride, force-quit the app: the banner goes to dashes after about 20 seconds; opening the app removes it.
+5. iPhone Settings > RideLog > Live Activities off: recording still works, and Settings > Recording says why there is no banner.
+
+**Deleting**
+1. Rides: swipe a ride left, tap Delete, confirm. It disappears, and Home and Overview totals drop by that ride (the website too).
+2. Open a ride, tap the trash icon, confirm: you land back on the list without it.
+3. Record a short ride, wait for it to upload, and see that it shows up under Rides, Home and Overview without pulling to refresh.
+
 ## Not in the app (yet)
 
-Automatic start and stop, a Live Activity / Dynamic Island with the speed, a home-screen widget, Apple Watch. Those are the next round once
+Automatic start and stop, a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website. Next rounds, once
 Start/Stop is proven on the road.

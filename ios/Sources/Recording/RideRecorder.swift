@@ -45,6 +45,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
     private var backgroundSession: CLBackgroundActivitySession?
     private var timer: Timer?
     private var ticks = 0
+    private let liveActivity = LiveActivityController()
 
     /// A ride older than this cannot be resumed: continuing would draw a straight line across the gap and count it as distance.
     static let resumeWindowSeconds: TimeInterval = 10 * 60
@@ -55,6 +56,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
         self.uploader = RideUploader(store: store, api: api)
         super.init()
         manager.delegate = self
+        LiveActivityController.endLeftovers()          // the app was killed mid-ride last time: its Lock Screen banner would show frozen numbers
         refreshAuthorization()
         UIDevice.current.isBatteryMonitoringEnabled = true
         loadInterrupted()
@@ -227,6 +229,11 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
         ticks = 0
         startTimer()
         UIApplication.shared.isIdleTimerDisabled = keepScreenOn
+        if let trip { liveActivity.start(startedAt: trip.startedAt, snapshot: currentSnapshot()) }
+    }
+
+    private func currentSnapshot() -> LiveSnapshot {
+        RecordingLogic.snapshot(latest: latest, stats: stats, now: Date())
     }
 
     private func endTracking() {
@@ -237,6 +244,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
         timer?.invalidate()
         timer = nil
         UIApplication.shared.isIdleTimerDisabled = false
+        liveActivity.end()
         phase = .idle
     }
 
@@ -252,6 +260,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
     private func tick() {
         guard let trip else { return }
         elapsed = Date().timeIntervalSince(trip.startedAt)
+        liveActivity.update(currentSnapshot())           // spaced out by the controller
         ticks += 1
         if ticks % 30 == 0 { Task { await uploader.syncAll() } }
     }

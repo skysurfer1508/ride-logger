@@ -52,6 +52,15 @@ final class APIClient: ObservableObject {
         return try decode(try await sendRaw(request))
     }
 
+    /// A delete (a ride). The server refuses these without the client header.
+    func delete<T: Decodable>(_ path: String) async throws -> T {
+        var request = URLRequest(url: Config.baseURL.appendingPathComponent("api/v1/" + path))
+        request.httpMethod = "DELETE"
+        request.setValue(Config.clientHeaderValue, forHTTPHeaderField: Config.clientHeaderName)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return try decode(try await sendRaw(request))
+    }
+
     private func decode<T: Decodable>(_ data: Data) throws -> T {
         do {
             return try JSONDecoder.ridelog.decode(T.self, from: data)

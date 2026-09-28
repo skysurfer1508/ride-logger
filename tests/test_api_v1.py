@@ -211,3 +211,94 @@ def test_two_users_are_independent_sessions(alice, bob):
     assert alice.get("/api/v1/home").json()["ride_count"] == 1
     assert bob.get("/api/v1/home").json()["ride_count"] == 0
     assert logged_in(BOB).get("/api/v1/rides/1").status_code == 404
+
+
+# ----------------------------------------------------------------- delete --
+
+def add_points(owner_sub: str, ride_id: int | None, trip_id: str | None, count: int = 3) -> None:
+    from app.db import get_db
+    conn = get_db()
+    try:
+        for i in range(count):
+            conn.execute(
+                "INSERT INTO points (owner_sub, device_id, lat, lon, timestamp, trip_id, ride_id, raw_properties) VALUES (?, 'dev', 47, 8, ?, ?, ?, '{}')",
+                (owner_sub, f"2026-09-01T10:00:0{i}Z", trip_id, ride_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def count(sql: str, *args) -> int:
+    from app.db import get_db
+    conn = get_db()
+    try:
+        return conn.execute(sql, args).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_delete_removes_the_ride_and_its_points(alice):
+    keep = add_ride(ALICE["sub"], days_ago(3), trip_id="keep")
+    gone = add_ride(ALICE["sub"], days_ago(2), trip_id="gone")
+    add_points(ALICE["sub"], keep, "keep")
+    add_points(ALICE["sub"], gone, "gone")
+    r = alice.delete(f"/api/v1/rides/{gone}", headers=CLIENT)
+    assert r.status_code == 200 and r.json() == {"api": 1, "deleted": gone}
+    assert count("SELECT COUNT(*) FROM rides WHERE id = ?", gone) == 0
+    assert count("SELECT COUNT(*) FROM points WHERE ride_id = ?", gone) == 0
+    assert count("SELECT COUNT(*) FROM rides WHERE id = ?", keep) == 1          # the other ride is untouched
+    assert count("SELECT COUNT(*) FROM points WHERE ride_id = ?", keep) == 3
+
+
+def test_deleting_also_removes_points_of_the_trip_that_no_ride_has_yet(alice):
+    """Points still waiting for their ride would otherwise bring it straight back (stale-trip sweep)."""
+    rid = add_ride(ALICE["sub"], days_ago(2), trip_id="t")
+    add_points(ALICE["sub"], rid, "t", count=2)
+    add_points(ALICE["sub"], None, "t", count=2)
+    alice.delete(f"/api/v1/rides/{rid}", headers=CLIENT)
+    assert count("SELECT COUNT(*) FROM points") == 0
+
+
+def test_a_deleted_ride_does_not_come_back_on_the_next_ingest(alice):
+    """A gap-inferred ride (no trip) is deleted with its points, so the ingest that follows has nothing to rebuild it from."""
+    add_token(ALICE["sub"], ALICE["email"], "tok")
+    rid = add_ride(ALICE["sub"], "2026-09-01T10:00:00+00:00", trip_id=None)
+    add_points(ALICE["sub"], rid, None, count=6)
+    alice.delete(f"/api/v1/rides/{rid}", headers=CLIENT)
+    assert alice.post("/api/ingest", json={"locations": []}, headers={"Authorization": "Bearer tok"}).status_code == 200
+    assert count("SELECT COUNT(*) FROM rides") == 0
+
+
+def test_the_totals_follow_a_delete(alice):
+    a = add_ride(ALICE["sub"], days_ago(2), distance_m=40_000)
+    add_ride(ALICE["sub"], days_ago(1), distance_m=60_000)
+    assert alice.get("/api/v1/home").json()["ride_count"] == 2
+    alice.delete(f"/api/v1/rides/{a}", headers=CLIENT)
+    home = alice.get("/api/v1/home").json()
+    assert home["ride_count"] == 1 and home["total_distance_display"] == "60"
+    assert alice.get(f"/api/v1/rides/{a}").status_code == 404
+
+
+def test_you_cannot_delete_someone_elses_ride(alice, bob):
+    theirs = add_ride(BOB["sub"], days_ago(1), trip_id="bobs")
+    add_points(BOB["sub"], theirs, "bobs")
+    r = alice.delete(f"/api/v1/rides/{theirs}", headers=CLIENT)
+    assert r.status_code == 404 and r.json() == {"detail": "ride_not_found"}          # the same answer as for a ride that doesn't exist
+    assert alice.delete("/api/v1/rides/99999", headers=CLIENT).json() == r.json()
+    assert count("SELECT COUNT(*) FROM rides WHERE id = ?", theirs) == 1
+    assert count("SELECT COUNT(*) FROM points WHERE ride_id = ?", theirs) == 3
+    assert bob.get(f"/api/v1/rides/{theirs}").status_code == 200
+
+
+def test_delete_needs_the_client_header_and_a_login(alice, anon):
+    rid = add_ride(ALICE["sub"], days_ago(1))
+    assert alice.delete(f"/api/v1/rides/{rid}").status_code == 403
+    assert anon.delete(f"/api/v1/rides/{rid}", headers=CLIENT).status_code == 401
+    assert count("SELECT COUNT(*) FROM rides WHERE id = ?", rid) == 1
+
+
+def test_deleting_twice_is_a_404_the_second_time(alice):
+    rid = add_ride(ALICE["sub"], days_ago(1))
+    assert alice.delete(f"/api/v1/rides/{rid}", headers=CLIENT).status_code == 200
+    assert alice.delete(f"/api/v1/rides/{rid}", headers=CLIENT).status_code == 404

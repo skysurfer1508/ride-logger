@@ -14,14 +14,17 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.1"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "1.2"
+    CURRENT_PROJECT_VERSION: "3"
 targets:
   RideLog:
     type: application
     platform: iOS
     sources:
       - Sources
+      - Shared
+    dependencies:
+      - target: RideLogWidgets                         # the Live Activity / Dynamic Island (embedded in the app)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger
@@ -36,6 +39,7 @@ targets:
         SiteHost: $(SITE_HOST)
         ITSAppUsesNonExemptEncryption: false
         UIUserInterfaceStyle: Dark                     # the website is a night-mode dash; so is the app
+        NSSupportsLiveActivities: true                 # speed and distance on the Lock Screen and in the Dynamic Island
         UIBackgroundModes:
           - location                                   # keep recording a ride with the screen locked
         NSLocationWhenInUseUsageDescription: RideLog uses your location while you record a ride, to draw the route and work out distance and speed. It keeps recording with the screen locked until you press Stop. Your rides are uploaded only to your own server.
@@ -47,6 +51,27 @@ targets:
           - UIInterfaceOrientationPortrait
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+  RideLogWidgets:
+    # The Live Activity. If this target ever stops the app from building: delete this block, the `- target: RideLogWidgets` dependency and
+    # `NSSupportsLiveActivities` above, the `RideLogWidgets/` and `Shared/RideActivityAttributes.swift` files, and
+    # Sources/Recording/LiveActivityController.swift together with its uses in RideRecorder.swift. Recording itself does not depend on it.
+    type: app-extension
+    platform: iOS
+    sources:
+      - RideLogWidgets
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger.widgets
+        PRODUCT_NAME: RideLogWidgets
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: RideLogWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: RideLog
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   RideLogTests:
     type: bundle.unit-test
     platform: iOS
@@ -62,6 +87,7 @@ targets:
       - Sources/Recording/RecordingLogic.swift
       - Sources/Recording/IngestPayload.swift
       - Sources/Recording/TripStore.swift
+      - Shared/LiveSnapshot.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger.tests

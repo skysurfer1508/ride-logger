@@ -92,9 +92,10 @@ final class RideUploader: ObservableObject {
             refreshCounts()
         }
         var failure: String?
+        var finishedARide = false
         for record in store.records() where record.ownerEmail == creds.email {
             do {
-                try await upload(record.tripId)
+                if try await upload(record.tripId) { finishedARide = true }
             } catch {
                 failure = (error as? LocalizedError)?.errorDescription ?? "Upload failed."
                 break
@@ -102,6 +103,8 @@ final class RideUploader: ObservableObject {
         }
         lastError = failure
         if failure == nil { store.purgeUploaded(keeping: 5) }
+        // a ride just became complete on the server: Home, Rides, Overview and the map reload (not on every mid-ride batch)
+        if finishedARide { NotificationCenter.default.post(name: .ridesChanged, object: nil) }
     }
 
     func refreshCounts() {
@@ -123,10 +126,13 @@ final class RideUploader: ObservableObject {
 
     // MARK: one ride
 
-    private func upload(_ tripId: String) async throws {
+    /// Sends what the server doesn't have of one ride. Returns true if this call delivered the trip marker (the ride is now complete on the server).
+    @discardableResult
+    private func upload(_ tripId: String) async throws -> Bool {
+        var completed = false
         while true {
             // Re-read the ride every round: the recorder keeps adding fixes, and Stop can finish it while a batch is in flight.
-            guard let record = store.record(tripId: tripId) else { return }
+            guard let record = store.record(tripId: tripId) else { return completed }
             let samples = store.samples(tripId: tripId)
             if samples.isEmpty {
                 if record.isFinished && !record.markerSent {
@@ -134,11 +140,11 @@ final class RideUploader: ObservableObject {
                     done.markerSent = true            // nothing to say about a ride with no fixes
                     try store.save(done)
                 }
-                return
+                return completed
             }
             let range = UploadPlan.nextRange(total: samples.count, uploaded: record.uploadedCount)
             let carriesMarker = UploadPlan.carriesMarker(range: range, total: samples.count, finished: record.isFinished, markerSent: record.markerSent)
-            if range.isEmpty && !carriesMarker { return }
+            if range.isEmpty && !carriesMarker { return completed }
 
             var marker: IngestPayload.Marker?
             if carriesMarker, let end = record.endedAt, let last = samples.last {
@@ -148,7 +154,8 @@ final class RideUploader: ObservableObject {
             let body = try IngestPayload.body(samples: Array(samples[range]), trip: record, marker: marker)
             try await post(body)
 
-            guard var latest = store.record(tripId: tripId) else { return }
+            if marker != nil { completed = true }
+            guard var latest = store.record(tripId: tripId) else { return completed }
             latest.uploadedCount = max(latest.uploadedCount, range.upperBound)
             if marker != nil { latest.markerSent = true }
             try store.save(latest)

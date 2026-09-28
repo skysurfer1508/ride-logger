@@ -76,6 +76,11 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(settings.detection.staleTripMinutes, 60)
     }
 
+    func testDeleteResponse() throws {
+        let json = #"{"api":1,"deleted":42}"#
+        XCTAssertEqual(try JSONDecoder.ridelog.decode(DeleteResponse.self, from: Data(json.utf8)).deleted, 42)
+    }
+
     func testAnEmptyAccountDecodes() throws {
         let json = #"{"api":1,"ride_count":0,"total_distance_display":"0","avg_speed_display":"0","latest":null,"recent_routes":[]}"#
         let home = try JSONDecoder.ridelog.decode(HomeResponse.self, from: Data(json.utf8))

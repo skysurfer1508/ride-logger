@@ -144,6 +144,13 @@ enum RecordingLogic {
         return sample.horizontalAccuracy <= Geo.maxAccuracyM ? .fair : .weak
     }
 
+    /// The numbers for the Lock Screen / Dynamic Island right now.
+    static func snapshot(latest: LocationSample?, stats: LiveStats, now: Date) -> LiveSnapshot {
+        let q = quality(of: latest, now: now)
+        return LiveSnapshot(speedKmh: displayedSpeedKmh(latest: latest, now: now), distanceM: stats.distanceM,
+                            maxKmh: Format.kmh(fromMps: stats.maxSpeedMps), gpsOK: q == .good || q == .fair)
+    }
+
     /// Rides this short are not worth keeping: the rider pressed Start by mistake.
     static func isWorthKeeping(sampleCount: Int) -> Bool { sampleCount >= 2 }
 }

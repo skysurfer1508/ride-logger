@@ -112,6 +112,19 @@ def ride_detail(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
     return reply({"ride": views.ride_summary(view), "polyline": polyline})
 
 
+@router.delete("/rides/{ride_id}", dependencies=[Depends(require_api_client)])
+def delete_ride(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
+    """Deletes one of my rides and its GPS points. Someone else's ride is the same 404 as a missing one and is left untouched."""
+    conn = get_db()
+    try:
+        deleted = views.delete_ride(conn, owner_sub, ride_id)
+    finally:
+        conn.close()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="ride_not_found")
+    return reply({"deleted": ride_id})
+
+
 @router.get("/overview")
 def overview(owner_sub: str = Depends(current_owner_sub)):
     conn = get_db()

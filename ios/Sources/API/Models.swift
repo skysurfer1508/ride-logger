@@ -111,6 +111,10 @@ struct SettingsResponse: Decodable {
     let detection: Detection
 }
 
+struct DeleteResponse: Decodable {
+    let deleted: Int
+}
+
 struct TokenResponse: Decodable {
     let ingestToken: String
     let ingestPath: String

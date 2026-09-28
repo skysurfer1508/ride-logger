@@ -31,5 +31,8 @@ struct LoaderScreen<T: Decodable, Content: View>: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .task { await loader.loadIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: .ridesChanged)) { _ in
+            Task { await loader.refresh() }
+        }
     }
 }

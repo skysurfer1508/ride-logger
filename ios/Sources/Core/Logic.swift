@@ -2,6 +2,11 @@ import Foundation
 
 // Pure decisions, no UIKit: kept apart so they can be unit-tested (Tests/LogicTests.swift, Cmd+U in Xcode).
 
+extension Notification.Name {
+    /// Posted when the set of rides on the server changed (one was deleted, or a recorded ride finished uploading): screens that show rides reload.
+    static let ridesChanged = Notification.Name("ridelog.ridesChanged")
+}
+
 /// The tabs, in order.
 enum AppTab: Int, CaseIterable, Identifiable {
     case home, rides, record, overview, settings

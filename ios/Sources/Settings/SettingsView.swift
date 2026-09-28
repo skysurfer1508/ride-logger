@@ -121,6 +121,10 @@ struct SettingsView: View {
                 .foregroundStyle(Theme.text)
             Text("Recording continues with the screen locked. Keeping it on makes the speed easy to read on a mount but uses more battery.")
                 .font(.footnote).foregroundStyle(Theme.muted)
+            Text(LiveActivityController.isAvailable
+                 ? "Live speed and distance show on the Lock Screen and in the Dynamic Island while you record."
+                 : "Live Activities are off for RideLog, so there is no Lock Screen or Dynamic Island display. Turn them on in the iPhone's Settings app > RideLog.")
+                .font(.footnote).foregroundStyle(Theme.muted)
             UploadStatus(uploader: uploader)
                 .frame(maxWidth: .infinity, alignment: .leading)
 

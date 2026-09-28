@@ -26,6 +26,25 @@ final class RidesModel: ObservableObject {
         await fetch(offset: rides.count, replacing: false)
     }
 
+    /// Deletes a ride on the server (with its GPS points) and takes it off the list. A ride the server no longer has counts as deleted.
+    func delete(_ ride: RideSummary) async {
+        do {
+            let _: DeleteResponse = try await api.delete("rides/\(ride.id)")
+            removeLocally(ride)
+        } catch APIError.server(404) {
+            removeLocally(ride)
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            staleMessage = "Couldn't delete the ride. " + ((error as? LocalizedError)?.errorDescription ?? "")
+        }
+    }
+
+    private func removeLocally(_ ride: RideSummary) {
+        rides.removeAll { $0.id == ride.id }
+        NotificationCenter.default.post(name: .ridesChanged, object: nil)      // Home, Overview and the map reload their numbers
+    }
+
     private func fetch(offset: Int, replacing: Bool) async {
         busy = true
         defer { busy = false }
@@ -63,6 +82,7 @@ struct RidesView: View {
     let api: APIClient
     @StateObject private var model: RidesModel
     @State private var showFilters = false
+    @State private var pendingDelete: RideSummary?
 
     init(api: APIClient) {
         self.api = api
@@ -98,6 +118,16 @@ struct RidesView: View {
                 }
             }
             .task { if !model.loaded { await model.reload() } }
+            .onReceive(NotificationCenter.default.publisher(for: .ridesChanged)) { _ in
+                // a recorded ride finished uploading, or one was deleted elsewhere: the list is out of date
+                if model.loaded && !model.busy { Task { await model.reload() } }
+            }
+            .confirmationDialog("Delete this ride?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+                                titleVisibility: .visible, presenting: pendingDelete) { ride in
+                Button("Delete ride", role: .destructive) { Task { await model.delete(ride) } }
+            } message: { ride in
+                Text("The \(Format.km(fromMeters: ride.distanceM)) km ride on \(Format.day(iso: ride.startTime)) and its GPS track are removed from your server. This can't be undone.")
+            }
         }
     }
 
@@ -114,6 +144,9 @@ struct RidesView: View {
             ForEach(model.rides) { ride in
                 NavigationLink(value: ride) { RideRow(ride: ride) }
                     .listRowBackground(Theme.surface)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {      // no full-swipe: a delete needs a deliberate tap and a confirmation
+                        Button(role: .destructive) { pendingDelete = ride } label: { Label("Delete", systemImage: "trash") }
+                    }
                     .onAppear {
                         if ride.id == model.rides.last?.id { Task { await model.loadMore() } }
                     }
@@ -189,6 +222,10 @@ struct RideFiltersSheet: View {
 struct RideDetailView: View {
     let api: APIClient
     let ride: RideSummary
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmDelete = false
+    @State private var deleting = false
+    @State private var errorText: String?
 
     var body: some View {
         LoaderScreen(api: api, path: "rides/\(ride.id)") { (detail: RideDetailResponse) in
@@ -196,6 +233,40 @@ struct RideDetailView: View {
         }
         .navigationTitle(Format.shortDay(iso: ride.startTime))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(role: .destructive) { confirmDelete = true } label: { Image(systemName: "trash") }
+                    .disabled(deleting)
+                    .accessibilityLabel("Delete this ride")
+            }
+        }
+        .confirmationDialog("Delete this ride?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete ride", role: .destructive) { Task { await delete() } }
+        } message: {
+            Text("The ride and its GPS track are removed from your server. This can't be undone.")
+        }
+        .alert("Couldn't delete the ride", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorText ?? "")
+        }
+    }
+
+    private func delete() async {
+        deleting = true
+        defer { deleting = false }
+        do {
+            let _: DeleteResponse = try await api.delete("rides/\(ride.id)")
+            NotificationCenter.default.post(name: .ridesChanged, object: nil)
+            dismiss()
+        } catch APIError.server(404) {
+            NotificationCenter.default.post(name: .ridesChanged, object: nil)      // already gone
+            dismiss()
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
+        }
     }
 }
 

@@ -24,3 +24,4 @@ var/
 ios/*.xcodeproj/
 ios/Signing.local.xcconfig
 ios/Sources/Info.plist
+ios/RideLogWidgets/Info.plist

@@ -113,3 +113,36 @@ final class TripRecordTests: XCTestCase {
         XCTAssertFalse(record.isFinished)
     }
 }
+
+final class LiveSnapshotTests: XCTestCase {
+    func testTheSnapshotCarriesWhatTheLockScreenShows() {
+        let fixes = [makeSample(0, lat: 47.0, speed: 20), makeSample(5, lat: 47.001, speed: 25)]
+        let stats = LiveStats.from(fixes)
+        let snap = RecordingLogic.snapshot(latest: fixes.last, stats: stats, now: fixes[1].timestamp.addingTimeInterval(1))
+        XCTAssertEqual(snap.speedKmh, 90)                       // 25 m/s
+        XCTAssertEqual(snap.maxKmh, 90)
+        XCTAssertEqual(snap.distanceM, stats.distanceM)
+        XCTAssertTrue(snap.gpsOK)
+    }
+
+    func testAStoppedBikeShowsZeroAndAWeakSignalIsFlagged() {
+        let fix = makeSample(0, speed: 20, accuracy: 120)
+        XCTAssertFalse(RecordingLogic.snapshot(latest: fix, stats: LiveStats.from([fix]), now: fix.timestamp).gpsOK)        // 120 m: weak
+        let good = makeSample(0, speed: 20)
+        XCTAssertEqual(RecordingLogic.snapshot(latest: good, stats: LiveStats.from([good]), now: good.timestamp.addingTimeInterval(10)).speedKmh, 0)
+        let none = RecordingLogic.snapshot(latest: nil, stats: LiveStats(), now: Date())
+        XCTAssertEqual(none, LiveSnapshot(speedKmh: 0, distanceM: 0, maxKmh: 0, gpsOK: false))
+    }
+
+    func testDistanceTextIsShortEnoughForTheIslandsCompactSlot() {
+        XCTAssertEqual(LiveSnapshot(speedKmh: 0, distanceM: 12_345, maxKmh: 0, gpsOK: true).distanceCompact, "12.3")
+        XCTAssertEqual(LiveSnapshot(speedKmh: 0, distanceM: 99_949, maxKmh: 0, gpsOK: true).distanceCompact, "99.9")
+        XCTAssertEqual(LiveSnapshot(speedKmh: 0, distanceM: 123_456, maxKmh: 0, gpsOK: true).distanceCompact, "123")
+        XCTAssertEqual(LiveSnapshot(speedKmh: 0, distanceM: 0, maxKmh: 0, gpsOK: true).distanceKm, "0.0")
+    }
+
+    func testTheSnapshotSurvivesTheRoundTripTheSystemDoesBetweenAppAndWidget() throws {
+        let snap = LiveSnapshot(speedKmh: 87, distanceM: 4321.5, maxKmh: 112, gpsOK: true)
+        XCTAssertEqual(try JSONDecoder().decode(LiveSnapshot.self, from: JSONEncoder().encode(snap)), snap)
+    }
+}
