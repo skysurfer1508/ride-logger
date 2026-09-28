@@ -1,0 +1,7 @@
+{
+ "api": 1,
+ "email": "alice@example.com",
+ "ingest_path": "/api/ingest",
+ "ingest_token": "fixture-ingest-token-0000000000000000000",
+ "name": "Alice"
+}

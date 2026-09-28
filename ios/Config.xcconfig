@@ -1,0 +1,6 @@
+// The one place to set the server. Host name only: no "https://" (xcconfig treats // as a comment).
+SITE_HOST = ride.skyserver1508.org
+
+// Your Apple developer team, kept out of git. Copy Signing.local.xcconfig.example to Signing.local.xcconfig and put your team id in it;
+// it survives `xcodegen generate`. (The line below is ignored if the file doesn't exist.)
+#include? "Signing.local.xcconfig"

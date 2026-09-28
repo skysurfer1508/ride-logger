@@ -1,0 +1,9 @@
+{
+ "api": 1,
+ "detection": {
+  "gap_minutes": 10.0,
+  "min_distance_m": 200.0,
+  "min_points": 5,
+  "stale_trip_minutes": 60.0
+ }
+}

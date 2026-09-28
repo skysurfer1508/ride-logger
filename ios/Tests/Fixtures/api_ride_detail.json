@@ -1,0 +1,35 @@
+{
+ "api": 1,
+ "polyline": [
+  [
+   47.3769,
+   8.5417
+  ],
+  [
+   47.3801,
+   8.5502
+  ],
+  [
+   47.3866,
+   8.5611
+  ],
+  [
+   47.3902,
+   8.5739
+  ]
+ ],
+ "ride": {
+  "avg_kmh": 56,
+  "distance_km": 88.0,
+  "distance_m": 88000.0,
+  "duration_hm": "1:35",
+  "duration_s": 5700.0,
+  "elevation_gain_m": 610,
+  "end_time": "2026-09-19T12:00:00+00:00",
+  "id": 2,
+  "max_kmh": 139,
+  "point_count": 180,
+  "source": "trip_marker",
+  "start_time": "2026-09-19T12:00:00+00:00"
+ }
+}
