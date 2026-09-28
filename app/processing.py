@@ -33,9 +33,24 @@ def _parse_ts(ts: str) -> datetime:
     return dt
 
 
-def insert_point(conn: sqlite3.Connection, feature: LocationFeature, owner_sub: str) -> None:
+def insert_point(conn: sqlite3.Connection, feature: LocationFeature, owner_sub: str) -> bool:
+    """Store one point. Returns False (and stores nothing) if this exact point is already there.
+
+    A client that never saw the "ok" for a batch has to send it again, and Overland and the RideLog app both do. Without this a
+    retried batch would double its points and inflate the ride's distance. "Same point" = same owner, device, timestamp and position.
+    """
     props = feature.properties
     lon, lat = feature.geometry.coordinates[0], feature.geometry.coordinates[1]
+    duplicate = conn.execute(
+        """
+        SELECT 1 FROM points
+        WHERE owner_sub = ? AND device_id = ? AND timestamp = ? AND lat = ? AND lon = ?
+        LIMIT 1
+        """,
+        (owner_sub, props.device_id or "", props.timestamp, lat, lon),
+    ).fetchone()
+    if duplicate:
+        return False
     conn.execute(
         """
         INSERT INTO points (owner_sub, device_id, lat, lon, timestamp, speed, altitude,
@@ -59,6 +74,7 @@ def insert_point(conn: sqlite3.Connection, feature: LocationFeature, owner_sub: 
             props.model_dump_json(),
         ),
     )
+    return True
 
 
 def _rows_to_points(rows) -> list[dict]:

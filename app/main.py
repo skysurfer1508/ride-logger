@@ -9,7 +9,7 @@ from .auth import NotAuthenticated, OnboardingRequired
 from .config import settings
 from .db import init_db
 from .paths import STATIC_DIR
-from .routers import auth, dashboard, ingest
+from .routers import api_v1, auth, dashboard, ingest, native_auth
 
 
 @asynccontextmanager
@@ -47,4 +47,6 @@ async def onboarding_required_handler(request: Request, exc: OnboardingRequired)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(ingest.router)
 app.include_router(auth.router)
+app.include_router(native_auth.router)
+app.include_router(api_v1.router)
 app.include_router(dashboard.router)

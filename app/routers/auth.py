@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from ..auth import oauth
+from ..auth import oauth, safe_next
 from ..config import settings
 from ..paths import TEMPLATES_DIR
 
@@ -15,13 +15,13 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 @router.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, next: str = "/"):
     if request.session.get("user"):
-        return RedirectResponse(url=next or "/", status_code=303)
+        return RedirectResponse(url=safe_next(next), status_code=303)
     return templates.TemplateResponse(request, "login.html", {"next": next})
 
 
 @router.get("/login/authentik")
 async def login_authentik(request: Request, next: str = "/"):
-    request.session["post_login_next"] = next
+    request.session["post_login_next"] = safe_next(next)
     return await oauth.authentik.authorize_redirect(request, settings.oidc_redirect_uri)
 
 
@@ -35,7 +35,7 @@ async def auth_callback(request: Request):
         "name": userinfo.get("name") or userinfo.get("preferred_username", ""),
     }
     next_url = request.session.pop("post_login_next", "/")
-    return RedirectResponse(url=next_url or "/", status_code=303)
+    return RedirectResponse(url=safe_next(next_url), status_code=303)
 
 
 @router.get("/logout")

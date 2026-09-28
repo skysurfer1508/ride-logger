@@ -1,0 +1,1237 @@
+{
+ "device_id": "ridelog-ios-TEST0001",
+ "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4",
+ "trip": {
+  "start": "2026-09-28T09:15:00Z",
+  "end": "2026-09-28T09:18:15Z",
+  "duration_s": 195,
+  "distance_m": 4282.0
+ },
+ "samples": [
+  {
+   "timestamp": "2026-09-28T09:15:00Z",
+   "lat": 47.3769,
+   "lon": 8.5417,
+   "speed": 18.0,
+   "altitude": 410.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.82
+  },
+  {
+   "timestamp": "2026-09-28T09:15:05Z",
+   "lat": 47.3778,
+   "lon": 8.5423,
+   "speed": 19.5,
+   "altitude": 410.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.819
+  },
+  {
+   "timestamp": "2026-09-28T09:15:10Z",
+   "lat": 47.3787,
+   "lon": 8.5429,
+   "speed": 21.0,
+   "altitude": 413.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.818
+  },
+  {
+   "timestamp": "2026-09-28T09:15:15Z",
+   "lat": 47.3796,
+   "lon": 8.5435,
+   "speed": 22.5,
+   "altitude": 413.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.817
+  },
+  {
+   "timestamp": "2026-09-28T09:15:20Z",
+   "lat": 47.3805,
+   "lon": 8.5441,
+   "speed": 24.0,
+   "altitude": 416.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.816
+  },
+  {
+   "timestamp": "2026-09-28T09:15:25Z",
+   "lat": 47.3814,
+   "lon": 8.5447,
+   "speed": 18.0,
+   "altitude": 416.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.815
+  },
+  {
+   "timestamp": "2026-09-28T09:15:30Z",
+   "lat": 47.3823,
+   "lon": 8.5453,
+   "speed": 19.5,
+   "altitude": 419.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.814
+  },
+  {
+   "timestamp": "2026-09-28T09:15:35Z",
+   "lat": 47.3832,
+   "lon": 8.5459,
+   "speed": 21.0,
+   "altitude": 419.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.813
+  },
+  {
+   "timestamp": "2026-09-28T09:15:40Z",
+   "lat": 47.3841,
+   "lon": 8.5465,
+   "speed": 22.5,
+   "altitude": 422.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.812
+  },
+  {
+   "timestamp": "2026-09-28T09:15:45Z",
+   "lat": 47.385,
+   "lon": 8.5471,
+   "speed": 24.0,
+   "altitude": 422.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.811
+  },
+  {
+   "timestamp": "2026-09-28T09:15:50Z",
+   "lat": 47.3859,
+   "lon": 8.5477,
+   "speed": 18.0,
+   "altitude": 425.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.81
+  },
+  {
+   "timestamp": "2026-09-28T09:15:55Z",
+   "lat": 47.3868,
+   "lon": 8.5483,
+   "speed": 19.5,
+   "altitude": 425.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.809
+  },
+  {
+   "timestamp": "2026-09-28T09:16:00Z",
+   "lat": 47.3877,
+   "lon": 8.5489,
+   "speed": 21.0,
+   "altitude": 428.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.808
+  },
+  {
+   "timestamp": "2026-09-28T09:16:05Z",
+   "lat": 47.3886,
+   "lon": 8.5495,
+   "speed": 22.5,
+   "altitude": 428.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.807
+  },
+  {
+   "timestamp": "2026-09-28T09:16:10Z",
+   "lat": 47.3895,
+   "lon": 8.5501,
+   "speed": 24.0,
+   "altitude": 431.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.806
+  },
+  {
+   "timestamp": "2026-09-28T09:16:15Z",
+   "lat": 47.3904,
+   "lon": 8.5507,
+   "speed": 18.0,
+   "altitude": 431.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.805
+  },
+  {
+   "timestamp": "2026-09-28T09:16:20Z",
+   "lat": 47.3913,
+   "lon": 8.5513,
+   "speed": 19.5,
+   "altitude": 434.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.804
+  },
+  {
+   "timestamp": "2026-09-28T09:16:25Z",
+   "lat": 47.3922,
+   "lon": 8.5519,
+   "speed": 21.0,
+   "altitude": 434.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.803
+  },
+  {
+   "timestamp": "2026-09-28T09:16:30Z",
+   "lat": 47.3931,
+   "lon": 8.5525,
+   "speed": 22.5,
+   "altitude": 437.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.802
+  },
+  {
+   "timestamp": "2026-09-28T09:16:35Z",
+   "lat": 47.394,
+   "lon": 8.5531,
+   "speed": 24.0,
+   "altitude": 437.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.801
+  },
+  {
+   "timestamp": "2026-09-28T09:16:40Z",
+   "lat": 47.3949,
+   "lon": 8.5537,
+   "speed": 18.0,
+   "altitude": 440.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.8
+  },
+  {
+   "timestamp": "2026-09-28T09:16:45Z",
+   "lat": 47.3958,
+   "lon": 8.5543,
+   "speed": 19.5,
+   "altitude": 440.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.799
+  },
+  {
+   "timestamp": "2026-09-28T09:16:50Z",
+   "lat": 47.3967,
+   "lon": 8.5549,
+   "speed": 21.0,
+   "altitude": 443.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.798
+  },
+  {
+   "timestamp": "2026-09-28T09:16:55Z",
+   "lat": 47.3976,
+   "lon": 8.5555,
+   "speed": 22.5,
+   "altitude": 443.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.797
+  },
+  {
+   "timestamp": "2026-09-28T09:17:00Z",
+   "lat": 47.3985,
+   "lon": 8.5561,
+   "speed": 24.0,
+   "altitude": 446.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.796
+  },
+  {
+   "timestamp": "2026-09-28T09:17:05Z",
+   "lat": 47.3994,
+   "lon": 8.5567,
+   "speed": 18.0,
+   "altitude": 446.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.795
+  },
+  {
+   "timestamp": "2026-09-28T09:17:10Z",
+   "lat": 47.4003,
+   "lon": 8.5573,
+   "speed": 19.5,
+   "altitude": 449.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.794
+  },
+  {
+   "timestamp": "2026-09-28T09:17:15Z",
+   "lat": 47.4012,
+   "lon": 8.5579,
+   "speed": 21.0,
+   "altitude": 449.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.793
+  },
+  {
+   "timestamp": "2026-09-28T09:17:20Z",
+   "lat": 47.4021,
+   "lon": 8.5585,
+   "speed": 22.5,
+   "altitude": 452.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.792
+  },
+  {
+   "timestamp": "2026-09-28T09:17:25Z",
+   "lat": 47.403,
+   "lon": 8.5591,
+   "speed": 24.0,
+   "altitude": 452.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.791
+  },
+  {
+   "timestamp": "2026-09-28T09:17:30Z",
+   "lat": 47.4039,
+   "lon": 8.5597,
+   "speed": 18.0,
+   "altitude": 455.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.79
+  },
+  {
+   "timestamp": "2026-09-28T09:17:35Z",
+   "lat": 47.4048,
+   "lon": 8.5603,
+   "speed": 19.5,
+   "altitude": 455.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.789
+  },
+  {
+   "timestamp": "2026-09-28T09:17:40Z",
+   "lat": 47.4057,
+   "lon": 8.5609,
+   "speed": 21.0,
+   "altitude": 458.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.788
+  },
+  {
+   "timestamp": "2026-09-28T09:17:45Z",
+   "lat": 47.4066,
+   "lon": 8.5615,
+   "speed": 22.5,
+   "altitude": 458.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.787
+  },
+  {
+   "timestamp": "2026-09-28T09:17:50Z",
+   "lat": 47.4075,
+   "lon": 8.5621,
+   "speed": 24.0,
+   "altitude": 461.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.786
+  },
+  {
+   "timestamp": "2026-09-28T09:17:55Z",
+   "lat": 47.4084,
+   "lon": 8.5627,
+   "speed": 18.0,
+   "altitude": 461.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.785
+  },
+  {
+   "timestamp": "2026-09-28T09:18:00Z",
+   "lat": 47.4093,
+   "lon": 8.5633,
+   "speed": 19.5,
+   "altitude": 464.0,
+   "horizontal_accuracy": 5.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.784
+  },
+  {
+   "timestamp": "2026-09-28T09:18:05Z",
+   "lat": 47.4102,
+   "lon": 8.5639,
+   "speed": 21.0,
+   "altitude": 464.0,
+   "horizontal_accuracy": 6.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.783
+  },
+  {
+   "timestamp": "2026-09-28T09:18:10Z",
+   "lat": 47.4111,
+   "lon": 8.5645,
+   "speed": 22.5,
+   "altitude": 467.0,
+   "horizontal_accuracy": 7.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.782
+  },
+  {
+   "timestamp": "2026-09-28T09:18:15Z",
+   "lat": 47.412,
+   "lon": 8.5651,
+   "speed": 24.0,
+   "altitude": 467.0,
+   "horizontal_accuracy": 8.0,
+   "vertical_accuracy": 8.0,
+   "battery_level": 0.781
+  }
+ ],
+ "body": {
+  "locations": [
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5417,
+      47.3769
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:00Z",
+     "altitude": 410.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.82,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5423,
+      47.3778
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:05Z",
+     "altitude": 410.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.819,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5429,
+      47.3787
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:10Z",
+     "altitude": 413.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.818,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5435,
+      47.3796
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:15Z",
+     "altitude": 413.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.817,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5441,
+      47.3805
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:20Z",
+     "altitude": 416.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.816,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5447,
+      47.3814
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:25Z",
+     "altitude": 416.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.815,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5453,
+      47.3823
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:30Z",
+     "altitude": 419.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.814,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5459,
+      47.3832
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:35Z",
+     "altitude": 419.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.813,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5465,
+      47.3841
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:40Z",
+     "altitude": 422.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.812,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5471,
+      47.385
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:45Z",
+     "altitude": 422.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.811,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5477,
+      47.3859
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:50Z",
+     "altitude": 425.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.81,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5483,
+      47.3868
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:15:55Z",
+     "altitude": 425.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.809,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5489,
+      47.3877
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:00Z",
+     "altitude": 428.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.808,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5495,
+      47.3886
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:05Z",
+     "altitude": 428.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.807,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5501,
+      47.3895
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:10Z",
+     "altitude": 431.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.806,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5507,
+      47.3904
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:15Z",
+     "altitude": 431.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.805,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5513,
+      47.3913
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:20Z",
+     "altitude": 434.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.804,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5519,
+      47.3922
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:25Z",
+     "altitude": 434.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.803,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5525,
+      47.3931
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:30Z",
+     "altitude": 437.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.802,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5531,
+      47.394
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:35Z",
+     "altitude": 437.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.801,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5537,
+      47.3949
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:40Z",
+     "altitude": 440.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.8,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5543,
+      47.3958
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:45Z",
+     "altitude": 440.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.799,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5549,
+      47.3967
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:50Z",
+     "altitude": 443.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.798,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5555,
+      47.3976
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:16:55Z",
+     "altitude": 443.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.797,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5561,
+      47.3985
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:00Z",
+     "altitude": 446.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.796,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5567,
+      47.3994
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:05Z",
+     "altitude": 446.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.795,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5573,
+      47.4003
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:10Z",
+     "altitude": 449.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.794,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5579,
+      47.4012
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:15Z",
+     "altitude": 449.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.793,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5585,
+      47.4021
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:20Z",
+     "altitude": 452.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.792,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5591,
+      47.403
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:25Z",
+     "altitude": 452.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.791,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5597,
+      47.4039
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:30Z",
+     "altitude": 455.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.79,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5603,
+      47.4048
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:35Z",
+     "altitude": 455.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.789,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5609,
+      47.4057
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:40Z",
+     "altitude": 458.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.788,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5615,
+      47.4066
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:45Z",
+     "altitude": 458.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.787,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5621,
+      47.4075
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:50Z",
+     "altitude": 461.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.786,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5627,
+      47.4084
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:17:55Z",
+     "altitude": 461.0,
+     "speed": 18.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.785,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5633,
+      47.4093
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:18:00Z",
+     "altitude": 464.0,
+     "speed": 19.5,
+     "horizontal_accuracy": 5.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.784,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5639,
+      47.4102
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:18:05Z",
+     "altitude": 464.0,
+     "speed": 21.0,
+     "horizontal_accuracy": 6.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.783,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5645,
+      47.4111
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:18:10Z",
+     "altitude": 467.0,
+     "speed": 22.5,
+     "horizontal_accuracy": 7.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.782,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5651,
+      47.412
+     ]
+    },
+    "properties": {
+     "timestamp": "2026-09-28T09:18:15Z",
+     "altitude": 467.0,
+     "speed": 24.0,
+     "horizontal_accuracy": 8.0,
+     "vertical_accuracy": 8.0,
+     "battery_level": 0.781,
+     "device_id": "ridelog-ios-TEST0001",
+     "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
+    }
+   },
+   {
+    "type": "Feature",
+    "geometry": {
+     "type": "Point",
+     "coordinates": [
+      8.5651,
+      47.412
+     ]
+    },
+    "properties": {
+     "type": "trip",
+     "timestamp": "2026-09-28T09:18:15Z",
+     "mode": "motorcycle",
+     "start": "2026-09-28T09:15:00Z#a1b2c3d4",
+     "end": "2026-09-28T09:18:15Z",
+     "duration": 195,
+     "distance": 4282.0,
+     "stopped_automatically": false,
+     "device_id": "ridelog-ios-TEST0001"
+    }
+   }
+  ]
+ }
+}

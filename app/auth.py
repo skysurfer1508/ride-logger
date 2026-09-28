@@ -27,6 +27,26 @@ def require_login(request: Request) -> None:
         raise NotAuthenticated()
 
 
+def safe_next(url: str | None) -> str:
+    """Only allow same-site relative redirects after login (no open redirect via ?next=//evil.example)."""
+    if url and url.startswith("/") and not url.startswith("//") and "\\" not in url:
+        return url
+    return "/"
+
+
+def require_api_login(request: Request) -> None:
+    """Like require_login, for the JSON API the iOS app uses: a plain 401 (the app cannot follow a redirect to an HTML login page)."""
+    if not request.session.get("user"):
+        raise HTTPException(status_code=401, detail="not_authenticated")
+
+
+def require_api_client(request: Request) -> None:
+    """State-changing API calls must come from a client that sets this header (a browser form or link from another site cannot),
+    on top of the session cookie's SameSite=Lax."""
+    if request.headers.get("x-ridelog-client") != "1":
+        raise HTTPException(status_code=403, detail="client_header_required")
+
+
 def current_owner_sub(request: Request) -> str:
     return request.session["user"]["sub"]
 
