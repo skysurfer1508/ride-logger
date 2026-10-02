@@ -250,24 +250,23 @@ the Watch shows what the phone sends.
    `group.com.skyserver1508.ridelogger.watch`; if your Apple ID cannot create it, the complication shows dashes and everything else still works.
 4. If the Watch build ever fails and you just want it gone, see the comment above the RideLogWatch block in `ios/project.yml`.
 
-## Plan a ride: loops through twisty roads, A to B, follow on the Record tab
+## Plan a ride: where to, in four styles, loops through twisty roads, follow on the Record tab
 
-Traffic tab > **Plan** (top left). Pan the map to where you want to start first: the start is the middle of the map that was showing.
+Traffic tab > **Plan** (top left). Two tabs: **Trip** (A to B, like Maps) and **Loop**.
 
-- **Loop:** choose a length (20 to 400 km), whether to avoid motorways, to stay on paved roads, and whether to prefer roads you have not ridden, then *Find loops*.
-  Up to three different loops come back with length, time, how many km of them are twisty, and a score; pick one on the list or the map.
-  How it works (app/planner.py): waypoints go round a circle through the start, each moved onto the best twisty stretch of the Roads layer nearby and routed *along*
-  it (in one end, out the other); about 20 to 40 candidates are routed by Valhalla's motorcycle routing, each re-sized until its length is within 8% of what you
-  asked, then scored on twistiness (measured on the route's real shape), on how much of it goes back over road it has already used, on how close the length is, and
-  (if you ask) on how much is new to you. It takes 4 to 6 seconds. In a narrow valley there may be no other way back, and then the loop honestly says it
-  "goes back over 40% of its own road". Without the road database loops are still made, just not steered through twisty roads (it says so).
-- **A to B:** switch to *A to B* and tap the destination on the small map; one motorcycle route comes back (no twistiness steering: it is the normal route).
-- **Follow:** *Follow* makes it your active route: it is drawn in blue on the Traffic map and on the Record tab's map, and the Record tab shows how far along
-  you are, how many km to go, and "On the route" or "Off the route by 340 m". That is all: **no turn-by-turn, no voice, no rerouting**. The route is kept on the
-  phone, so it is still there after the app is closed. *Stop following* (in the Plan sheet) or *Clear route* (Record tab, before starting) removes it.
-- **Save / GPX:** *Save* keeps it on your server (up to 100 routes, listed in the Plan sheet to follow again or delete); *GPX* saves and opens the share sheet so you
-  can put the file on a Garmin, Komoot, Strava or Apple Files. The length is worked out on the server from the line.
-- Needs Valhalla running (see the limits section); the road database is optional. If the routing service is busy or down the sheet says so.
+- **Trip:** *From* is where you are by default (tap to type another address), *To* is the finish; *Add stop* puts up to five stops in between (tap a stop to change it, the cross removes it,
+  *Swap* turns the trip round). Addresses and places are found by **Apple Maps' own search** as you type (no key, nothing on your server): a street and number, a town, a shop, a pass;
+  or *Choose on the map* to drop a pin. Recent places are kept on the phone; press and hold a place to save it as **Home** or **Work**, which then sit at the top of the list.
+- **Four styles** (chosen with the chips, measured on real Swiss trips, Zurich to Chur: 84, 106 and 182 minutes):
+  **Ultra fast** motorways and main roads, the quickest way; **Fast** quick, with a motorway only where it saves a lot; **Relaxed** no motorways and about a quarter fewer turns, a bit longer;
+  **Twisty** no motorways, steered through twisty stretches of the Roads layer between your start and finish, within the extra time you allow with the slider (+5 min to +2 h).
+  On the test trips Twisty found 26, 21 and 19 km of twisty road against 16, 10 and 6 for Relaxed, always inside the time allowed. With stops in between, or without the road database, Twisty
+  is the Relaxed route and says so. *Ultra fast / Fast* also show up to two alternative ways.
+- **Loop:** as before (a length, from where you are or from an address, avoid motorways, paved only, prefer roads you have not ridden).
+- **Results:** up to three routes on a map with distance, time, twisty km and a score; pick one. **Follow** puts it on the Traffic and Record maps in blue with distance along and off the route;
+  **Save** keeps it on your server together with the stops and the style that make it (so it can be ridden again with directions); **GPX** saves and opens the share sheet.
+- Every route now comes with its **turns** (the server asks Valhalla for directions, in English) and a full-resolution line; the voice guidance that uses them is the next release.
+- Needs Valhalla running (see the limits section); the road database is only needed for Twisty and loops through twisty roads. If the routing service is busy or down the sheet says so.
 
 ## GPX export and import
 
@@ -345,6 +344,12 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
    "tap to start" notification appear? Open Settings > Auto-start log and look for "watch": it says what happened. Tell Claude what you see.
 4. During a ride: is the speed on the wrist within a second or two of the phone? Walk away from the phone: "Waiting for iPhone..." should appear after about 12 seconds.
 5. Stop from the wrist: it asks, then the ride finishes and uploads. Add the complication to a watch face: it shows this week's km.
+
+**Trip planner**
+1. Traffic > Plan > Trip: From says "My location". Tap To, type a street and number you know: suggestions appear as you type; pick one. Does it find your address? Try a town, a pass, a shop.
+2. Press and hold a suggestion or recent place > Save as Home. Next time Home is at the top.
+3. Find routes with each of the four styles on the same trip: do they really differ (Ultra fast on the motorway, Relaxed on small roads, Twisty with more bends)? Does Twisty respect the extra time you allowed?
+4. Add a stop; swap; remove a stop. Choose on the map: drop a pin in a field, it is named from the address.
 
 **Planner**
 1. Traffic tab, pan to your street, Plan > Loop 80 km > Find loops: after a few seconds up to three loops appear on the little map and in the list, each starting and

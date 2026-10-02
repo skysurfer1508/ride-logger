@@ -40,6 +40,7 @@ final class PlannerLogicTests: XCTestCase {
         XCTAssertEqual(saved.distanceKm, 1.6, accuracy: 0.05)
         XCTAssertEqual(saved.durationMin, 60)
         XCTAssertEqual(saved.twistiness, 68)
+        XCTAssertEqual(saved.mode, "loop")
         let detail: SavedRouteDetailResponse = try load("api_planner_route")
         XCTAssertEqual(detail.route.id, saved.id)
         XCTAssertEqual(detail.route.name, saved.name)
@@ -47,6 +48,8 @@ final class PlannerLogicTests: XCTestCase {
         let active = PlannerLogic.activeRoute(from: detail.route, now: Date(timeIntervalSince1970: 0))
         XCTAssertEqual(active.points.count, detail.route.shape.count)
         XCTAssertNotNil(RouteFollow.line(active.points))
+        XCTAssertEqual(detail.route.waypoints?.map(\.type), ["break", "through", "break"])
+        XCTAssertEqual(detail.route.mode, "loop")
     }
 
     func testAnUnavailableAnswerDecodesAndExplainsItself() throws {
@@ -122,9 +125,49 @@ final class PlannerLogicTests: XCTestCase {
         XCTAssertEqual(PlannerLogic.loopForm(lat: -33.8, lon: -70.6, km: 50, avoidMotorways: false, pavedOnly: true, preferNew: false)["lat"], "-33.80000")
     }
 
-    func testTheRouteFormHasBothEnds() {
-        let form = PlannerLogic.routeForm(fromLat: 47.4, fromLon: 8.5, toLat: 46.9, toLon: 8.6, avoidMotorways: false, pavedOnly: true)
-        XCTAssertEqual(form, ["from_lat": "47.40000", "from_lon": "8.50000", "to_lat": "46.90000", "to_lon": "8.60000", "avoid_motorways": "false", "paved_only": "true"])
+    func testASavedRouteCarriesTheStopsThatMakeItAndItsStyle() throws {
+        var withStops = route(minutes: 60)
+        withStops.mode = "twisty"
+        withStops.waypoints = [RouteWaypoint(lat: 47, lon: 8), RouteWaypoint(lat: 47.05, lon: 8.02, type: "through"), RouteWaypoint(lat: 47, lon: 8)]
+        let form = PlannerLogic.saveForm(name: "Sunday", kind: "route", route: withStops)
+        XCTAssertEqual(form["mode"], "twisty")
+        let parsed = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(form["waypoints"]).utf8)) as? [[String: Any]]
+        XCTAssertEqual(parsed?.count, 3)
+        XCTAssertEqual(parsed?[1]["type"] as? String, "through")
+        XCTAssertNil(PlannerLogic.saveForm(name: "x", kind: "loop", route: route())["waypoints"])
+    }
+
+    func testFollowingARouteUsesItsFullResolutionLineWhenItHasOne() throws {
+        let trip: PlanResponse = try load("api_planner_trip")
+        let planned = try XCTUnwrap(trip.routes.first)
+        XCTAssertGreaterThan(Polyline6.decode(try XCTUnwrap(planned.shape6)).count, planned.shape.count)
+        let active = PlannerLogic.activeRoute(from: planned, name: "x", now: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(active.points.count, Polyline6.decode(planned.shape6!).count)
+        XCTAssertNotNil(RouteFollow.line(active.points))
+        let thin = PlannerLogic.activeRoute(from: route(), name: "x", now: Date(timeIntervalSince1970: 0))                // no shape6: the thinned line
+        XCTAssertEqual(thin.points.count, 2)
+    }
+
+    func testTheGoldenTripAndDirectionsAnswersDecodeWithTheirTurns() throws {
+        let trip: PlanResponse = try load("api_planner_trip")
+        XCTAssertTrue(trip.isOk)
+        XCTAssertEqual(trip.routes.map(\.name), ["Fast", "Alternative 1"])
+        let route = trip.routes[0]
+        XCTAssertEqual(route.mode, "fast")
+        XCTAssertEqual(route.waypoints?.count, 2)
+        let maneuvers = try XCTUnwrap(route.maneuvers)
+        XCTAssertEqual(maneuvers.count, 17)
+        XCTAssertEqual(maneuvers[0].type, 1)
+        XCTAssertEqual(maneuvers[0].street, "Bahnhofquai")
+        XCTAssertEqual(maneuvers[0].alongM, 0)
+        XCTAssertEqual(maneuvers.last?.type, 4)
+        XCTAssertEqual(maneuvers.map(\.alongM), maneuvers.map(\.alongM).sorted())
+        XCTAssertTrue(maneuvers.contains { $0.type == 26 && $0.roundaboutExit == 2 })
+        XCTAssertEqual(Set(maneuvers.map(\.leg)), [0, 1])
+        XCTAssertTrue(maneuvers.allSatisfy { !$0.pre.isEmpty })
+        let directions: PlanResponse = try load("api_planner_directions")
+        XCTAssertEqual(directions.routes.count, 1)
+        XCTAssertEqual(directions.routes[0].waypoints?.first?.type, "break")
     }
 
     func testTheSaveFormCarriesTheLineAsJSON() throws {

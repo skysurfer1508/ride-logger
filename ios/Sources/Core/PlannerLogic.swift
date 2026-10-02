@@ -64,21 +64,23 @@ enum PlannerLogic {
          "avoid_motorways": avoidMotorways ? "true" : "false", "paved_only": pavedOnly ? "true" : "false", "prefer_new": preferNew ? "true" : "false"]
     }
 
-    static func routeForm(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double, avoidMotorways: Bool, pavedOnly: Bool) -> [String: String] {
-        ["from_lat": String(format: "%.5f", fromLat), "from_lon": String(format: "%.5f", fromLon), "to_lat": String(format: "%.5f", toLat), "to_lon": String(format: "%.5f", toLon),
-         "avoid_motorways": avoidMotorways ? "true" : "false", "paved_only": pavedOnly ? "true" : "false"]
-    }
-
     /// The form that saves a planned route: its line as JSON text (the server works out the length and twistiness itself).
     static func saveForm(name: String, kind: String, route: PlannedRoute) -> [String: String] {
         let shape = "[" + route.shape.map { String(format: "[%.5f,%.5f]", $0.lat, $0.lon) }.joined(separator: ",") + "]"
-        return ["name": name, "kind": kind, "shape": shape, "duration_s": String(route.durationMin * 60)]
+        var form = ["name": name, "kind": kind, "shape": shape, "duration_s": String(route.durationMin * 60)]
+        if let waypoints = route.waypoints, !waypoints.isEmpty {                         // so the saved route can be navigated later
+            form["waypoints"] = TripLogic.directionsForm(waypoints: waypoints, mode: route.mode ?? "loop")["locations"]
+            if let mode = route.mode { form["mode"] = mode }
+        }
+        return form
     }
 
     // MARK: following
 
     static func activeRoute(from route: PlannedRoute, name: String, now: Date) -> ActiveRoute {
-        ActiveRoute(name: name, distanceKm: route.distanceKm, points: route.shape.map { [$0.lat, $0.lon] }, savedAt: now)
+        // the full-resolution line when the route has one: following (and later navigating) is only as exact as the line
+        let line = route.shape6.map { Polyline6.decode($0) }.flatMap { $0.count >= 2 ? $0 : nil } ?? route.shape
+        return ActiveRoute(name: name, distanceKm: route.distanceKm, points: line.map { [$0.lat, $0.lon] }, savedAt: now)
     }
 
     static func activeRoute(from saved: SavedRouteDetail, now: Date) -> ActiveRoute {

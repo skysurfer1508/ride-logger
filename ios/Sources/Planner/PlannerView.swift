@@ -14,7 +14,13 @@ struct PlannerView: View {
     @Environment(\.dismiss) private var dismiss
 
     enum Mode: String, CaseIterable, Identifiable {
-        case loop = "Loop", route = "A to B"
+        case loop = "Loop", route = "Trip"
+        var id: String { rawValue }
+    }
+
+    /// Which place the picker is choosing.
+    enum Picking: String, Identifiable {
+        case origin, destination, stop
         var id: String { rawValue }
     }
 
@@ -30,7 +36,14 @@ struct PlannerView: View {
     @State private var avoidMotorways = true
     @State private var pavedOnly = true
     @State private var preferNew = false
-    @State private var destination: CLLocationCoordinate2D?
+    @State private var origin: Place?                       // nil: where the phone is
+    @State private var destination: Place?
+    @State private var stops: [Place] = []
+    @State private var routeMode: RouteMode = .fast
+    @State private var detour = TripLogic.defaultDetour
+    @State private var picking: Picking?
+    @State private var editingStop: Int?
+    @State private var locator = CurrentLocationFetcher()
     @State private var phase: Phase = .idle
     @State private var selected = 0
     @State private var saved: [SavedRouteSummary] = []
@@ -65,6 +78,9 @@ struct PlannerView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadSaved() }
             .sheet(item: $shareItem) { item in ShareSheet(items: [item.url]) }
+            .sheet(item: $picking) { which in
+                PlacePickerSheet(title: title(for: which), allowMyLocation: which == .origin, near: start) { place in picked(place, for: which) }
+            }
             .confirmationDialog("Delete this route?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }), titleVisibility: .visible) {
                 Button("Delete route", role: .destructive) {
                     if let route = confirmDelete { Task { await delete(route) } }
@@ -89,7 +105,8 @@ struct PlannerView: View {
     // MARK: asking
 
     private var loopPanel: some View {
-        Panel(title: "A loop from the middle of the map") {
+        Panel(title: "A loop") {
+            fromButton
             HStack(alignment: .lastTextBaseline) {
                 Text("\(Int(km))").font(Theme.readout(40, weight: .bold)).foregroundStyle(Theme.text)
                 Text("KM").font(Theme.label).foregroundStyle(Theme.accent)
@@ -103,22 +120,126 @@ struct PlannerView: View {
                 Text("Find loops").frame(maxWidth: .infinity).padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent).disabled(isPlanning)
-            Text("Starts at \(String(format: "%.4f, %.4f", start.latitude, start.longitude)). Pan the map to your start point before opening this.")
-                .font(.caption).foregroundStyle(Theme.muted)
         }
     }
 
     private var routePanel: some View {
-        Panel(title: "From the middle of the map to a place you tap") {
-            RoutePicker(start: start, destination: $destination).frame(height: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border, lineWidth: 1))
-            Text(destination == nil ? "Tap the map to set the destination." : "Tap again to move it.").font(.caption).foregroundStyle(Theme.muted)
-            options
-            Button { Task { await planRoute() } } label: {
-                Text("Find a route").frame(maxWidth: .infinity).padding(.vertical, 6)
+        Panel(title: "Where to?") {
+            fromButton
+            ForEach(Array(stops.enumerated()), id: \.offset) { index, stop in
+                HStack(spacing: 8) {
+                    placeButton(icon: "\(index + 1).circle.fill", tint: Theme.muted, title: "Stop \(index + 1)", text: stop.line) { editingStop = index; picking = .stop }
+                    Button { stops.remove(at: index); phase = .idle } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.muted) }
+                        .accessibilityLabel("Remove stop \(index + 1)")
+                }
             }
-            .buttonStyle(.borderedProminent).disabled(isPlanning || destination == nil)
+            placeButton(icon: "mappin.circle.fill", tint: Theme.danger, title: "To", text: destination?.line ?? "Choose a place") { picking = .destination }
+            HStack {
+                Button { editingStop = nil; picking = .stop } label: { Label("Add stop", systemImage: "plus.circle") }
+                    .disabled(destination == nil || stops.count >= TripLogic.maxStops)
+                Spacer()
+                Button { swapEnds() } label: { Label("Swap", systemImage: "arrow.up.arrow.down") }
+                    .disabled(origin == nil || destination == nil)
+            }
+            .font(.footnote)
+            modeChips
+            Toggle("Paved roads only", isOn: $pavedOnly).tint(Theme.accent).foregroundStyle(Theme.text)
+            Button { Task { await planRoute() } } label: {
+                Text("Find routes").frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent).disabled(isPlanning || !TripLogic.canPlan(finish: destination, stops: stops))
+        }
+    }
+
+    // MARK: places
+
+    private var fromButton: some View {
+        placeButton(icon: "location.circle.fill", tint: Theme.accent, title: "From", text: origin?.line ?? "My location") { picking = .origin }
+    }
+
+    private func placeButton(icon: String, tint: Color, title: String, text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).foregroundStyle(tint).frame(width: 24)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title.uppercased()).font(Theme.label).tracking(1).foregroundStyle(Theme.muted)
+                    Text(text).font(.subheadline).foregroundStyle(Theme.text).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.muted)
+            }
+            .padding(10)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title): \(text)")
+    }
+
+    private func title(for which: Picking) -> String {
+        switch which {
+        case .origin: return "From"
+        case .destination: return "To"
+        case .stop: return "Add a stop"
+        }
+    }
+
+    private func picked(_ place: Place?, for which: Picking) {
+        switch which {
+        case .origin: origin = place
+        case .destination: destination = place
+        case .stop:
+            if let place {
+                if let index = editingStop, stops.indices.contains(index) { stops[index] = place } else if stops.count < TripLogic.maxStops { stops.append(place) }
+            }
+            editingStop = nil
+        }
+        phase = .idle                                                         // the routes shown belong to the old places
+    }
+
+    private func swapEnds() {
+        guard let from = origin, let to = destination else { return }
+        origin = to
+        destination = from
+        stops.reverse()
+        phase = .idle
+    }
+
+    /// Where the trip starts: the chosen place, else where the phone is, else the middle of the map (said so).
+    private func startPoint() async -> (lat: Double, lon: Double) {
+        if let origin { return (origin.lat, origin.lon) }
+        if let here = await locator.fetch() { return (here.coordinate.latitude, here.coordinate.longitude) }
+        notice = "Could not find where you are, so the middle of the map is the start. Choose a start address, or allow location for RideLog."
+        return (start.latitude, start.longitude)
+    }
+
+    // MARK: styles
+
+    private var modeChips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                ForEach(RouteMode.allCases) { mode in
+                    Button { routeMode = mode; phase = .idle } label: {
+                        Label(mode.title, systemImage: mode.symbol)
+                            .font(.footnote.weight(.semibold))
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity).padding(.vertical, 9)
+                            .background(routeMode == mode ? Theme.accent : Theme.surface, in: Capsule())
+                            .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                            .foregroundStyle(routeMode == mode ? Color.black : Theme.text)
+                    }
+                    .accessibilityLabel("\(mode.title): \(mode.blurb)")
+                }
+            }
+            Text(routeMode.blurb).font(.caption).foregroundStyle(Theme.muted)
+            if routeMode == .twisty {
+                HStack {
+                    Text("Up to \(TripLogic.detourText(minutes: detour)) longer").font(.footnote.weight(.semibold)).foregroundStyle(Theme.text)
+                    Spacer()
+                }
+                Slider(value: $detour, in: TripLogic.detourRange, step: TripLogic.detourStep).tint(Theme.accent)
+                    .accessibilityLabel("How much longer a twisty trip may take, in minutes")
+            }
         }
     }
 
@@ -224,7 +345,8 @@ struct PlannerView: View {
         selected = 0
         notice = nil
         do {
-            let form = PlannerLogic.loopForm(lat: start.latitude, lon: start.longitude, km: km, avoidMotorways: avoidMotorways, pavedOnly: pavedOnly, preferNew: preferNew)
+            let from = await startPoint()
+            let form = PlannerLogic.loopForm(lat: from.lat, lon: from.lon, km: km, avoidMotorways: avoidMotorways, pavedOnly: pavedOnly, preferNew: preferNew)
             let answer: PlanResponse = try await api.post("planner/loop", form: form)
             noRoadData = answer.roadsData == false
             if let problem = PlannerLogic.problem(answer) { phase = .failed(problem) } else { phase = .done(answer.routes) }
@@ -242,9 +364,10 @@ struct PlannerView: View {
         notice = nil
         noRoadData = false
         do {
-            let form = PlannerLogic.routeForm(fromLat: start.latitude, fromLon: start.longitude, toLat: destination.latitude, toLon: destination.longitude,
-                                              avoidMotorways: avoidMotorways, pavedOnly: pavedOnly)
+            let from = await startPoint()
+            let form = TripLogic.tripForm(start: from, stops: stops, finish: destination, mode: routeMode, detourMin: detour, pavedOnly: pavedOnly, alternatives: true)
             let answer: PlanResponse = try await api.post("planner/route", form: form)
+            if let note = answer.note { notice = note }
             if let problem = PlannerLogic.problem(answer) { phase = .failed(problem) } else { phase = .done(answer.routes) }
         } catch APIError.unauthorized {
             phase = .idle
@@ -253,8 +376,14 @@ struct PlannerView: View {
         }
     }
 
+    /// "To Hardstrasse 10 (Twisty)" for a trip, "Loop 118 km, 2 Oct" for a loop.
+    private func routeName(_ route: PlannedRoute) -> String {
+        if mode == .route, let destination { return "To \(destination.name) (\(RouteMode(rawValue: route.mode ?? "")?.title ?? "Route"))" }
+        return PlannerLogic.defaultName(kind: mode == .loop ? "loop" : "route", km: route.distanceKm, now: Date())
+    }
+
     private func follow(_ route: PlannedRoute) {
-        let name = PlannerLogic.defaultName(kind: mode == .loop ? "loop" : "route", km: route.distanceKm, now: Date())
+        let name = routeName(route)
         activeRoute.set(PlannerLogic.activeRoute(from: route, name: name, now: Date()))
         notice = "Following \"\(name)\". Open the Record tab before you set off."
     }
@@ -265,7 +394,7 @@ struct PlannerView: View {
         busy = true
         defer { busy = false }
         let kind = mode == .loop ? "loop" : "route"
-        let name = PlannerLogic.defaultName(kind: kind, km: route.distanceKm, now: Date())
+        let name = routeName(route)
         do {
             let answer: SavedRouteResponse = try await api.post("planner/routes", form: PlannerLogic.saveForm(name: name, kind: kind, route: route))
             notice = "Saved as \"\(answer.route.name)\"."
@@ -331,37 +460,6 @@ struct PlannerView: View {
 
 // MARK: - maps
 
-/// A small map where a tap sets the destination.
-private struct RoutePicker: View {
-    let start: CLLocationCoordinate2D
-    @Binding var destination: CLLocationCoordinate2D?
-    @State private var camera: MapCameraPosition
-
-    init(start: CLLocationCoordinate2D, destination: Binding<CLLocationCoordinate2D?>) {
-        self.start = start
-        _destination = destination
-        _camera = State(initialValue: .region(MKCoordinateRegion(center: start, span: MKCoordinateSpan(latitudeDelta: 0.4, longitudeDelta: 0.5))))
-    }
-
-    var body: some View {
-        MapReader { proxy in
-            Map(position: $camera) {
-                Annotation("", coordinate: start, anchor: .center) {
-                    Image(systemName: "circle.fill").foregroundStyle(Theme.accent).overlay(Circle().stroke(Color.white, lineWidth: 2))
-                }
-                if let destination {
-                    Annotation("", coordinate: destination, anchor: .bottom) {
-                        Image(systemName: "mappin.circle.fill").font(.system(size: 28)).foregroundStyle(Theme.danger)
-                    }
-                }
-            }
-            .onTapGesture(count: 1, coordinateSpace: .local) { location in
-                if let coordinate = proxy.convert(location, from: .local) { destination = coordinate }
-            }
-        }
-    }
-}
-
 /// The planned routes on a map: the chosen one bold, the others faint.
 private struct ResultMap: View {
     let start: CLLocationCoordinate2D
@@ -379,8 +477,13 @@ private struct ResultMap: View {
                 MapPolyline(coordinates: routes[selected].shape.map { $0.coordinate })
                     .stroke(Color(hex: 0x3478F6), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
             }
-            Annotation("", coordinate: start, anchor: .center) {
-                Image(systemName: "flag.checkered.circle.fill").font(.system(size: 22)).foregroundStyle(Theme.accent).background(Circle().fill(Color.white))
+            Annotation("", coordinate: routes.indices.contains(selected) ? (routes[selected].shape.first?.coordinate ?? start) : start, anchor: .center) {
+                Image(systemName: "circle.circle.fill").font(.system(size: 20)).foregroundStyle(Theme.accent).background(Circle().fill(Color.white))
+            }
+            if routes.indices.contains(selected), let end = routes[selected].shape.last, routes[selected].mode != "loop" {
+                Annotation("", coordinate: end.coordinate, anchor: .bottom) {
+                    Image(systemName: "mappin.circle.fill").font(.system(size: 26)).foregroundStyle(Theme.danger).background(Circle().fill(Color.white))
+                }
             }
         }
         .id(routes.map(\.name).joined(separator: "|") + "\(routes.first?.distanceKm ?? 0)")

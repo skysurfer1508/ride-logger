@@ -12,6 +12,8 @@ struct PlanResponse: Decodable {
     let tried: Int?
     /// False when the server has no twisty-road database: loops were still made, but not steered through twisty roads.
     let roadsData: Bool?
+    /// Something the person should know about the answer (for example that a twisty trip fell back to the relaxed route).
+    var note: String? = nil
 
     var isOk: Bool { status == "ok" }
 }
@@ -28,8 +30,43 @@ struct PlannedRoute: Decodable, Identifiable, Equatable {
     /// Percent of the route on roads you have not ridden (100 when nothing is known about your rides).
     let newPct: Int
     let shape: [RoadPoint]
+    /// "ultra_fast", "fast", "relaxed", "twisty" or "loop".
+    var mode: String? = nil
+    /// The stops that make the route: asking the server for them again gives the same route, with its turns.
+    var waypoints: [RouteWaypoint]? = nil
+    /// The route's full-resolution line, encoded (see Polyline6), and its turns: present when the route was asked for with directions.
+    var shape6: String? = nil
+    var maneuvers: [Maneuver]? = nil
 
     var id: String { name }
+}
+
+/// A stop of a trip, as sent to and from the server.
+struct RouteWaypoint: Codable, Equatable {
+    var lat: Double
+    var lon: Double
+    /// "break" (a stop of the trip) or "through" (a point the route must pass without stopping).
+    var type: String = "break"
+}
+
+/// One turn of a route (Valhalla's maneuver). `pre`, `alert` and `post` are the sentences meant to be spoken before, at and after it.
+struct Maneuver: Decodable, Equatable {
+    /// Valhalla's maneuver type code (see GuidanceText).
+    let type: Int
+    let instruction: String
+    let pre: String
+    let alert: String?
+    let post: String?
+    let street: String?
+    let lengthM: Double
+    let timeS: Double
+    /// Metres from the start of the whole route to this maneuver.
+    let alongM: Double
+    let lat: Double
+    let lon: Double
+    /// Which stretch between stops it belongs to (0 for the first).
+    let leg: Int
+    let roundaboutExit: Int?
 }
 
 struct SavedRouteSummary: Decodable, Identifiable, Equatable {
@@ -42,6 +79,7 @@ struct SavedRouteSummary: Decodable, Identifiable, Equatable {
     let twistyKm: Double
     let twistiness: Int
     let createdAt: String
+    var mode: String? = nil
 }
 
 struct SavedRoutesResponse: Decodable {
@@ -58,6 +96,8 @@ struct SavedRouteDetail: Decodable, Equatable {
     let twistiness: Int
     let createdAt: String
     let shape: [RoadPoint]
+    var mode: String? = nil
+    var waypoints: [RouteWaypoint]? = nil
 }
 
 struct SavedRouteDetailResponse: Decodable {
