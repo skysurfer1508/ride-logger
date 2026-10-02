@@ -35,6 +35,8 @@ ENDPOINTS = {
     "api_insights": "/api/v1/rides/{insights_ride_id}/insights",
     "api_roads": "/api/v1/roads?south=47.39&west=8.55&north=47.45&east=8.65&min_score=0",
     "api_planner_loop": ("/api/v1/planner/loop", {"lat": 47.3769, "lon": 8.5417, "distance_km": 60}),
+    "api_planner_trip": ("/api/v1/planner/route", {"locations": json.dumps([{"lat": 47.3769, "lon": 8.5417}, {"lat": 47.4988, "lon": 8.7241}]), "mode": "fast", "alternatives": "1"}),
+    "api_planner_directions": ("/api/v1/planner/directions", {"locations": json.dumps([{"lat": 47.3769, "lon": 8.5417, "type": "break"}, {"lat": 47.4988, "lon": 8.7241, "type": "break"}]), "mode": "relaxed"}),
     "api_planner_routes": "/api/v1/planner/routes",
     "api_planner_route": "/api/v1/planner/routes/{route_id}",
     "api_traffic_config": "/api/v1/traffic/config",
@@ -131,6 +133,8 @@ def test_fixture_matches_the_live_api(name, alice, seeded, monkeypatch):
     route_id = None
     if name.startswith("api_planner"):
         route_id = _planner_for_fixture(alice, monkeypatch)
+    if name in ("api_planner_trip", "api_planner_directions"):
+        _real_valhalla_for_fixture(monkeypatch)
     spec = ENDPOINTS[name]
     if isinstance(spec, tuple):
         response = alice.post(spec[0], data=spec[1], headers={"X-RideLog-Client": "1"})
@@ -181,6 +185,23 @@ def _planner_for_fixture(alice, monkeypatch):
     """A routing service that joins the points with lines, and one saved route (returns its id)."""
     from test_planner import FakeRouter, SHAPE
     FakeRouter(monkeypatch)
-    saved = alice.post("/api/v1/planner/routes", data={"name": "Sunday loop", "kind": "loop", "shape": json.dumps(SHAPE), "duration_s": 3600}, headers={"X-RideLog-Client": "1"})
+    waypoints = json.dumps([{"lat": 47.0, "lon": 8.0, "type": "break"}, {"lat": 47.05, "lon": 8.02, "type": "through"}, {"lat": 47.0, "lon": 8.0, "type": "break"}])
+    saved = alice.post("/api/v1/planner/routes", data={"name": "Sunday loop", "kind": "loop", "shape": json.dumps(SHAPE), "duration_s": 3600, "waypoints": waypoints, "mode": "loop"},
+                       headers={"X-RideLog-Client": "1"})
     assert saved.status_code == 200
     return saved.json()["route"]["id"]
+
+
+def _real_valhalla_for_fixture(monkeypatch):
+    """The routing service answers with a REAL captured Valhalla trip (tests/data), so the golden JSON holds real maneuvers: roundabout, stops, spoken sentences."""
+    from pathlib import Path
+    from app import valhalla
+    real = json.loads((Path(__file__).parent / "data" / "valhalla_trip_instructions.json").read_text())
+
+    def route(locations, avoid_motorways=True, paved_only=True, *, costing_options=None, directions=False, language="en-US", alternates=0, heading=None):
+        out = valhalla.parse_trip(real["trip"])
+        if alternates:
+            out["alternates"] = [valhalla.parse_trip(real["trip"])]
+        return out
+
+    monkeypatch.setattr(valhalla, "route", route)

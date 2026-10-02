@@ -120,12 +120,13 @@ def _overlap(a: set, b: set) -> float:
     return len(a & b) / max(1, min(len(a), len(b)))
 
 
-def present(route: dict, measured: dict, name: str) -> dict:
-    """A route as the app gets it."""
+def present(route: dict, measured: dict, name: str, *, waypoints: Optional[list] = None, mode: Optional[str] = None) -> dict:
+    """A route as the app gets it. When the route has maneuvers (it was asked for with directions) the full-resolution line (encoded polyline6) and the maneuvers go
+    along for turn-by-turn; `waypoints` are the stops that make the route, so the app can ask for the same route again (a saved route, a reroute)."""
     shape = route["shape"]
     step = max(25.0, route["distance_m"] / SHAPE_POINTS)
     thin = curvature.resample(shape, step)
-    return {
+    out = {
         "name": name,
         "distance_km": round(route["distance_m"] / 1000.0, 1),
         "duration_min": round(route["duration_s"] / 60.0),
@@ -135,6 +136,14 @@ def present(route: dict, measured: dict, name: str) -> dict:
         "new_pct": round(100.0 * (1.0 - measured["ridden_share"])),
         "shape": [[round(lat, 5), round(lon, 5)] for lat, lon in thin],
     }
+    if mode:
+        out["mode"] = mode
+    if waypoints is not None:
+        out["waypoints"] = [{"lat": round(w["lat"], 6), "lon": round(w["lon"], 6), "type": w.get("type", "break")} for w in waypoints]
+    if route.get("maneuvers"):
+        out["shape6"] = valhalla.encode_polyline6(shape)
+        out["maneuvers"] = route["maneuvers"]
+    return out
 
 
 # --------------------------------------------------------------------------------------------------------------------------------- snapping --
@@ -175,11 +184,13 @@ def loop_locations(conn, start: tuple[float, float], target_m: float, rotation: 
 
 # ------------------------------------------------------------------------------------------------------------------------------------- loops --
 
-def _try(locations: list[dict], avoid_motorways: bool, paved_only: bool) -> Optional[dict]:
+def _try(locations: list[dict], avoid_motorways: bool, paved_only: bool, **extra) -> Optional[dict]:
     try:
-        return valhalla.route(locations, avoid_motorways=avoid_motorways, paved_only=paved_only)
+        route = valhalla.route(locations, avoid_motorways=avoid_motorways, paved_only=paved_only, **extra)
     except valhalla.NoRoute:
         return None
+    route["locations"] = locations                       # kept so that the chosen routes can be asked for again with directions
+    return route
 
 
 def plan_loops(start: tuple[float, float], distance_km: float, roads_conn=None, ridden: Optional[set] = None, avoid_motorways: bool = True, paved_only: bool = True,
@@ -231,15 +242,175 @@ def plan_loops(start: tuple[float, float], distance_km: float, roads_conn=None, 
         if len(chosen) == MAX_ROUTES:
             break
     names = ["Best loop", "Alternative", "Another option"]
-    return {"routes": [present(r, m, names[i]) for i, (_, r, m) in enumerate(chosen)], "tried": len(results)}
+    presented = []
+    for i, (_, route, measured) in enumerate(chosen):
+        guided = _try(route["locations"], avoid_motorways, paved_only, directions=True) or route         # the same stops again, this time with the turns
+        presented.append(present(guided, measured, names[i], waypoints=route["locations"], mode="loop"))
+    return {"routes": presented, "tried": len(results)}
 
 
-def plan_route(start: tuple[float, float], end: tuple[float, float], ridden: Optional[set] = None, avoid_motorways: bool = True, paved_only: bool = True) -> dict:
-    """The motorcycle route from `start` to `end`, described like a loop. Raises PlannerError when there is none."""
-    route = _try([{"lat": start[0], "lon": start[1], "type": "break"}, {"lat": end[0], "lon": end[1], "type": "break"}], avoid_motorways, paved_only)
-    if route is None:
-        raise PlannerError("No route could be found between those points.")
-    return {"routes": [present(route, measure(route["shape"], ridden), "Route")], "tried": 1}
+# ---------------------------------------------------------------------------------------------------------------------------------- A to B --
+
+MODES = ("ultra_fast", "fast", "relaxed", "twisty")
+MODE_LABELS = {"ultra_fast": "Ultra fast", "fast": "Fast", "relaxed": "Relaxed", "twisty": "Twisty"}
+MAX_STOPS = 7                    # start, up to five stops in between, finish
+DEFAULT_DETOUR_MIN = 30
+MIN_DETOUR_MIN, MAX_DETOUR_MIN = 5, 180
+CORRIDOR_PER_MIN_M = 250.0       # a twisty stretch may lie this far off the direct route for each minute of detour allowed ...
+CORRIDOR_MIN_M, CORRIDOR_MAX_M = 2000.0, 15000.0          # ... between these limits
+TWISTY_CANDIDATES = 10
+TWISTY_MIN_SCORE = 55
+TIME_SLACK = 1.05
+STRETCH_SEPARATION_M = 3000.0
+
+
+def mode_options(mode: str, paved_only: bool = True) -> dict:
+    """Valhalla's motorcycle costing for each style. Measured on real Swiss trips (Zurich to Chur: ultra fast 119 km / 84 min on motorways, fast 118 km / 106 min with the
+    motorway only where it saves a lot, relaxed and twisty 127 km / 173 min on ordinary roads): use_highways is a smooth dial between about 0.2 (never) and 0.4 (always),
+    use_primary does nothing for motorcycles, and maneuver_penalty makes a route simpler (about a quarter fewer turns, a few km longer), which is what relaxed means here."""
+    if mode not in MODES:
+        raise PlannerError("Choose ultra fast, fast, relaxed or twisty.")
+    options: dict = {"use_trails": 0.0, "use_ferry": 0.0}
+    if mode == "ultra_fast":
+        options.update({"use_highways": 1.0, "use_tolls": 1.0})
+    elif mode == "fast":
+        options.update({"use_highways": 0.3, "use_tolls": 1.0})
+    elif mode == "relaxed":
+        options.update({"exclude_highways": True, "exclude_tolls": True, "maneuver_penalty": 100})
+    else:                                                  # twisty: no motorways; the twisty stretches are found by the planner, the routing between them is ordinary
+        options.update({"exclude_highways": True, "exclude_tolls": True, "maneuver_penalty": 30})
+    if paved_only:
+        options["exclude_unpaved"] = True
+    return options
+
+
+def _stops(locations: list[dict]) -> list[dict]:
+    if not 2 <= len(locations) <= MAX_STOPS:
+        raise PlannerError(f"A trip needs a start, a finish and at most {MAX_STOPS - 2} stops in between.")
+    return [{"lat": float(l["lat"]), "lon": float(l["lon"]), "type": l.get("type", "break")} for l in locations]
+
+
+def plan_trip(locations: list[dict], mode: str = "fast", paved_only: bool = True, alternatives: int = 0, detour_min: int = DEFAULT_DETOUR_MIN, roads_conn=None,
+              ridden: Optional[set] = None, heading: Optional[float] = None, prefer_new: bool = False) -> dict:
+    """The route from the first to the last of `locations` (stops in between are visited in order), in one of the four styles, with the turns for turn-by-turn.
+    Up to `alternatives` other ways between start and finish come back as well (only for a trip without stops). Raises PlannerError when there is no route and
+    valhalla.ValhallaUnavailable when the routing service is off or down."""
+    stops = _stops(locations)
+    options = mode_options(mode, paved_only)
+    if mode == "twisty":
+        return _plan_twisty(stops, options, detour_min, roads_conn, ridden, heading, prefer_new)
+    base = _try(stops, True, paved_only, costing_options=options, directions=True, alternates=max(0, min(2, alternatives)), heading=heading)
+    if base is None:
+        raise PlannerError("No route could be found between those places.")
+    found = [base] + list(base.get("alternates") or [])
+    routes = []
+    for i, route in enumerate(found):
+        name = MODE_LABELS[mode] if i == 0 else f"Alternative {i}"
+        routes.append(present(route, measure(route["shape"], ridden), name, waypoints=_pinned(stops, route) if i else stops, mode=mode))
+    return {"routes": routes, "tried": len(found)}
+
+
+def _pinned(stops: list[dict], route: dict, every_m: float = 6000.0) -> list[dict]:
+    """The stops of an alternative route with "through" points along its line added, so asking again for the same waypoints gives the same way and not the main route."""
+    line = route["shape"]
+    pins: list[dict] = []
+    along = 0.0
+    last_pin = 0.0
+    prev = line[0]
+    for point in line[1:]:
+        along += geo.haversine_m(prev[0], prev[1], point[0], point[1])
+        prev = point
+        if along - last_pin >= every_m and along < route["distance_m"] - every_m / 2:
+            pins.append({"lat": point[0], "lon": point[1], "type": "through"})
+            last_pin = along
+    return [stops[0]] + pins + stops[1:]
+
+
+def _plan_twisty(stops: list[dict], options: dict, detour_min: int, roads_conn, ridden: Optional[set], heading: Optional[float], prefer_new: bool) -> dict:
+    """A to B through twisty stretches: the ordinary route between the stops is the baseline; twisty stretches from the road database that lie near it are tried as
+    detours (one or two of them, in the order they come along the way), kept if the trip takes at most `detour_min` longer, and the twistiest wins. Without stops in
+    between and without the road database it is the baseline, said so."""
+    detour_min = max(MIN_DETOUR_MIN, min(MAX_DETOUR_MIN, int(detour_min)))
+    base = _try(stops, True, True, costing_options=options)
+    if base is None:
+        raise PlannerError("No route could be found between those places.")
+    note = None
+    candidates: list[list[dict]] = []
+    if len(stops) != 2:
+        note = "With stops in between the route is the relaxed one: twisty detours are only added between a start and a finish."
+    elif roads_conn is None:
+        note = "This server has no twisty-road database yet, so this is the relaxed route."
+    else:
+        candidates = _twisty_candidates(stops, base, detour_min, roads_conn)
+    budget_s = base["duration_s"] + detour_min * 60.0
+    results = [base]
+    if candidates:
+        with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+            routed = list(pool.map(lambda locs: _try(locs, True, True, costing_options=options), candidates))
+        results += [r for r in routed if r and r["duration_s"] <= budget_s * TIME_SLACK]
+    scored = sorted(((quality(measure(r["shape"], ridden), r["distance_m"], None, prefer_new), r) for r in results), key=lambda item: -item[0])
+    chosen: list[tuple[float, dict, dict]] = []
+    for q, route in scored:
+        m = measure(route["shape"], ridden)
+        if all(_overlap(m["cells"], other[2]["cells"]) < DISTINCT_OVERLAP for other in chosen):
+            chosen.append((q, route, m))
+        if len(chosen) == MAX_ROUTES:
+            break
+    names = ["Twistiest", "Alternative", "Another option"]
+    out = []
+    for i, (_, route, m) in enumerate(chosen):
+        locations = route.get("locations", stops)
+        guided = _try(locations, True, True, costing_options=options, directions=True, heading=heading) or route
+        out.append(present(guided, m, names[i] if len(chosen) > 1 or note is None else "Relaxed", waypoints=locations, mode="twisty"))
+    answer = {"routes": out, "tried": len(results)}
+    if note:
+        answer["note"] = note
+    return answer
+
+
+def _twisty_candidates(stops: list[dict], base: dict, detour_min: int, conn) -> list[list[dict]]:
+    """Waypoint lists that send the trip through one or two twisty stretches near the baseline route."""
+    line = curvature.resample(base["shape"], 100.0)
+    radius = min(CORRIDOR_MAX_M, max(CORRIDOR_MIN_M, detour_min * CORRIDOR_PER_MIN_M))
+    lats = [p[0] for p in line]
+    lons = [p[1] for p in line]
+    pad_lat = radius / 111_194.9266
+    pad_lon = pad_lat / max(0.2, math.cos(math.radians(sum(lats) / len(lats))))
+    found, _ = roads.query(conn, min(lats) - pad_lat, min(lons) - pad_lon, max(lats) + pad_lat, max(lons) + pad_lon, 400, TWISTY_MIN_SCORE, True)
+    near: list[tuple[float, int, dict]] = []                      # (how much twisty road, where along the baseline, the stretch)
+    for road in found:
+        mid = road["geometry"][len(road["geometry"]) // 2]
+        best, at = min(((geo.haversine_m(mid[0], mid[1], p[0], p[1]), i) for i, p in enumerate(line)))
+        if best <= radius:
+            near.append((road["curvy_m"], at, road))
+    near.sort(key=lambda item: -item[0])
+    chosen: list[tuple[float, int, dict]] = []
+    for item in near:
+        mid = item[2]["geometry"][len(item[2]["geometry"]) // 2]
+        if all(geo.haversine_m(mid[0], mid[1], *c[2]["geometry"][len(c[2]["geometry"]) // 2]) > STRETCH_SEPARATION_M for c in chosen):
+            chosen.append(item)
+        if len(chosen) == TWISTY_CANDIDATES:
+            break
+
+    def through(item, previous):
+        line_ = item[2]["geometry"]
+        ends = [(line_[0][0], line_[0][1]), (line_[-1][0], line_[-1][1])]
+        ends.sort(key=lambda e: geo.haversine_m(previous[0], previous[1], e[0], e[1]))
+        return [{"lat": e[0], "lon": e[1], "type": "through"} for e in ends]
+
+    start, end = stops[0], stops[-1]
+    plans: list[list[dict]] = []
+    for item in chosen:                                                      # one stretch
+        plans.append([start, *through(item, (start["lat"], start["lon"])), end])
+    ordered = sorted(chosen[:6], key=lambda item: item[1])                  # two stretches, in the order they come along the way
+    for i in range(len(ordered)):
+        for j in range(i + 1, len(ordered)):
+            if ordered[j][1] - ordered[i][1] < 30:                           # at least ~3 km apart along the way (samples are 100 m apart)
+                continue
+            first = through(ordered[i], (start["lat"], start["lon"]))
+            second = through(ordered[j], (first[-1]["lat"], first[-1]["lon"]))
+            plans.append([start, *first, *second, end])
+    return plans[:16]
 
 
 def ridden_cells(conn, owner_sub: str, south: float, west: float, north: float, east: float) -> set:

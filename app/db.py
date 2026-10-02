@@ -32,6 +32,13 @@ def _migrate_owner_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE rides ADD COLUMN bike_id INTEGER")
 
 
+def _migrate_later_columns(conn: sqlite3.Connection) -> None:
+    """Columns added to tables that earlier versions already created (CREATE TABLE IF NOT EXISTS does not add them). Runs after the whole schema."""
+    for column in ("waypoints", "mode"):                    # planned routes remember the stops that make them, to navigate them later
+        if not _column_exists(conn, "planned_routes", column):
+            conn.execute(f"ALTER TABLE planned_routes ADD COLUMN {column} TEXT")
+
+
 _MIGRATION_MARKER = "-- ##POST_MIGRATION##"
 
 
@@ -45,6 +52,8 @@ def init_db() -> None:
         _migrate_owner_columns(conn)
         conn.commit()
         conn.executescript(rest_sql)
+        conn.commit()
+        _migrate_later_columns(conn)
         conn.commit()
     finally:
         conn.close()

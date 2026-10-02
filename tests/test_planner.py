@@ -47,8 +47,9 @@ class FakeRouter:
         monkeypatch.setattr(settings, "valhalla_url", "http://valhalla.invalid")
         monkeypatch.setattr(valhalla, "route", self.route)
 
-    def route(self, locations, avoid_motorways=True, paved_only=True):
-        self.calls.append({"locations": list(locations), "avoid_motorways": avoid_motorways, "paved_only": paved_only})
+    def route(self, locations, avoid_motorways=True, paved_only=True, *, costing_options=None, directions=False, language="en-US", alternates=0, heading=None):
+        self.calls.append({"locations": list(locations), "avoid_motorways": avoid_motorways, "paved_only": paved_only, "costing_options": costing_options,
+                           "directions": directions, "alternates": alternates, "heading": heading})
         if self.unavailable:
             raise valhalla.ValhallaUnavailable("down")
         if self.fail_if and self.fail_if(locations):
@@ -61,7 +62,17 @@ class FakeRouter:
             part = wiggle(a, b, twisty=((a[1] + b[1]) / 2) > LON0 + 0.05)
             shape.extend(part[1:] if shape else part)
         straight = sum(geo.haversine_m(a[0], a[1], b[0], b[1]) for a, b in zip(pts, pts[1:]))
-        return {"distance_m": straight * self.factor, "duration_s": straight * self.factor / 12.0, "shape": shape}
+        speed = 12.0 * (2.0 if costing_options and costing_options.get("use_highways", 0) >= 1.0 else 1.0)          # motorways are twice as fast, in this pretend country
+        out = {"distance_m": straight * self.factor, "duration_s": straight * self.factor / speed, "shape": shape, "maneuvers": []}
+        if directions:
+            out["maneuvers"] = [{"type": 1, "instruction": "Drive north.", "pre": "Drive north.", "alert": None, "post": None, "street": None, "length_m": round(out["distance_m"]),
+                                 "time_s": round(out["duration_s"]), "along_m": 0, "lat": shape[0][0], "lon": shape[0][1], "leg": 0, "roundabout_exit": None},
+                                {"type": 4, "instruction": "You have arrived.", "pre": "You have arrived.", "alert": None, "post": None, "street": None, "length_m": 0, "time_s": 0,
+                                 "along_m": round(out["distance_m"]), "lat": shape[-1][0], "lon": shape[-1][1], "leg": len(pts) - 2, "roundabout_exit": None}]
+        if alternates and len(pts) == 2:
+            shifted = [(lat, lon + 0.01) for lat, lon in shape]
+            out["alternates"] = [{"distance_m": out["distance_m"] * 1.1, "duration_s": out["duration_s"] * 1.1, "shape": shifted, "maneuvers": out["maneuvers"] if directions else []}] * min(2, alternates)
+        return out
 
 
 @pytest.fixture
@@ -277,13 +288,107 @@ def test_lengths_outside_the_range_are_refused(router, km):
     assert router.calls == []
 
 
-def test_a_route_from_a_to_b_is_one_request_described_like_a_loop(router):
-    out = planner.plan_route(START, (LAT0 + 0.1, LON0 + 0.1))
-    assert len(out["routes"]) == 1 and out["routes"][0]["name"] == "Route" and out["tried"] == 1 and len(router.calls) == 1
-    assert [l["type"] for l in router.calls[0]["locations"]] == ["break", "break"]
+def AB(lat=0.1, lon=0.1):
+    return [{"lat": LAT0, "lon": LON0}, {"lat": LAT0 + lat, "lon": LON0 + lon}]
+
+
+def test_a_trip_from_a_to_b_comes_with_its_turns_and_the_stops_that_make_it(router):
+    out = planner.plan_trip(AB(), "fast")
+    route = out["routes"][0]
+    assert len(out["routes"]) == 1 and route["name"] == "Fast" and route["mode"] == "fast" and out["tried"] == 1
+    assert [m["type"] for m in route["maneuvers"]] == [1, 4] and valhalla.decode_polyline6(route["shape6"])[0] == pytest.approx((LAT0, LON0), abs=1e-5)
+    assert route["waypoints"] == [{"lat": round(LAT0, 6), "lon": round(LON0, 6), "type": "break"}, {"lat": round(LAT0 + 0.1, 6), "lon": round(LON0 + 0.1, 6), "type": "break"}]
+    assert router.calls[0]["directions"] is True
     router.fail_if = lambda locs: True
     with pytest.raises(planner.PlannerError, match="No route"):
-        planner.plan_route(START, (LAT0 + 0.1, LON0 + 0.1))
+        planner.plan_trip(AB(), "fast")
+
+
+@pytest.mark.parametrize("mode,expect", [
+    ("ultra_fast", {"use_highways": 1.0, "use_tolls": 1.0}), ("fast", {"use_highways": 0.3, "use_tolls": 1.0}),
+    ("relaxed", {"exclude_highways": True, "exclude_tolls": True, "maneuver_penalty": 100}), ("twisty", {"exclude_highways": True, "exclude_tolls": True}),
+])
+def test_each_style_asks_valhalla_for_its_own_kind_of_route(router, mode, expect):
+    options = planner.mode_options(mode)
+    assert options["exclude_unpaved"] is True and options["use_trails"] == 0.0 and expect.items() <= options.items()
+    assert "exclude_unpaved" not in planner.mode_options(mode, paved_only=False)
+    planner.plan_trip(AB(), mode)
+    assert router.calls[0]["costing_options"] == planner.mode_options(mode)
+
+
+def test_the_styles_really_differ_in_what_they_allow():
+    ultra, fast, relaxed = planner.mode_options("ultra_fast"), planner.mode_options("fast"), planner.mode_options("relaxed")
+    assert ultra["use_highways"] > fast["use_highways"] > 0 and "exclude_highways" not in ultra and "exclude_highways" not in fast
+    assert relaxed["exclude_highways"] and relaxed["maneuver_penalty"] > planner.mode_options("twisty")["maneuver_penalty"]
+    with pytest.raises(planner.PlannerError, match="ultra fast, fast, relaxed or twisty"):
+        planner.mode_options("warp")
+
+
+def test_ultra_fast_is_quicker_than_fast_is_quicker_than_relaxed_on_the_pretend_map(router):
+    minutes = {m: planner.plan_trip(AB(0.3, 0.3), m)["routes"][0]["duration_min"] for m in ("ultra_fast", "relaxed")}
+    assert minutes["ultra_fast"] < minutes["relaxed"]
+
+
+def test_stops_in_between_are_visited_in_order_and_there_is_a_limit(router):
+    stops = [{"lat": LAT0, "lon": LON0}, {"lat": LAT0 + 0.05, "lon": LON0 + 0.02}, {"lat": LAT0 + 0.1, "lon": LON0 + 0.05}, {"lat": LAT0 + 0.2, "lon": LON0}]
+    out = planner.plan_trip(stops, "relaxed")
+    assert [(w["lat"], w["lon"]) for w in out["routes"][0]["waypoints"]] == [(round(s["lat"], 6), round(s["lon"], 6)) for s in stops]
+    assert [m["leg"] for m in out["routes"][0]["maneuvers"]] == [0, 2]
+    with pytest.raises(planner.PlannerError, match="at most 5 stops"):
+        planner.plan_trip([stops[0]] * (planner.MAX_STOPS + 1), "fast")
+    with pytest.raises(planner.PlannerError):
+        planner.plan_trip(stops[:1], "fast")
+
+
+def test_alternatives_come_back_pinned_so_the_same_one_can_be_asked_for_again(router):
+    out = planner.plan_trip(AB(0.3, 0.3), "fast", alternatives=2)
+    assert [r["name"] for r in out["routes"]] == ["Fast", "Alternative 1", "Alternative 2"] and router.calls[0]["alternates"] == 2
+    main, alternative = out["routes"][0], out["routes"][1]
+    assert len(main["waypoints"]) == 2
+    assert len(alternative["waypoints"]) > 2 and {w["type"] for w in alternative["waypoints"][1:-1]} == {"through"}                   # pins along its own line
+    assert planner.plan_trip(AB(), "fast", alternatives=0)["routes"][0]["name"] == "Fast" and len(planner.plan_trip(AB(), "fast")["routes"]) == 1
+
+
+def test_the_heading_of_a_rider_on_the_road_is_passed_on(router):
+    planner.plan_trip(AB(), "fast", heading=270)
+    assert router.calls[0]["heading"] == 270
+
+
+def test_twisty_adds_detours_through_twisty_stretches_within_the_time_budget(router, tmp_path, monkeypatch):
+    conn = roads.create(tmp_path / "roads.db")
+    mid_lat, mid_lon = LAT0 + 0.05, LON0 + 0.05
+    roads.add_way(conn, 1, {"highway": "secondary", "name": "Twisty pass"}, road_coords(TWISTY, spacing=12, lat0=mid_lat + 0.01, lon0=mid_lon + 0.06))
+    roads.finish(conn, "test")
+    monkeypatch.setattr(settings, "roads_db_path", str(tmp_path / "roads.db"))
+    out = planner.plan_trip(AB(), "twisty", detour_min=60, roads_conn=roads.connect())
+    best = out["routes"][0]
+    assert best["mode"] == "twisty" and out["tried"] > 1 and any(w["type"] == "through" for w in best["waypoints"]) and best["maneuvers"]
+    plain = planner.plan_trip(AB(), "relaxed")["routes"][0]
+    assert best["twisty_km"] > plain["twisty_km"] and best["duration_min"] <= plain["duration_min"] + 60 * planner.TIME_SLACK + 1
+
+
+def test_twisty_never_exceeds_the_detour_the_rider_allowed(router, tmp_path, monkeypatch):
+    conn = roads.create(tmp_path / "roads.db")
+    roads.add_way(conn, 1, {"highway": "secondary"}, road_coords(TWISTY, spacing=12, lat0=LAT0 + 0.05, lon0=LON0 + 0.30))                  # far off to the side
+    roads.finish(conn, "test")
+    monkeypatch.setattr(settings, "roads_db_path", str(tmp_path / "roads.db"))
+    base = planner.plan_trip(AB(), "relaxed")["routes"][0]["duration_min"]
+    out = planner.plan_trip(AB(), "twisty", detour_min=planner.MIN_DETOUR_MIN, roads_conn=roads.connect())
+    assert all(r["duration_min"] <= base + planner.MIN_DETOUR_MIN * planner.TIME_SLACK + 1 for r in out["routes"])
+
+
+def test_twisty_without_road_data_or_with_stops_says_it_is_the_relaxed_route(router):
+    plain = planner.plan_trip(AB(), "twisty", roads_conn=None)
+    assert "no twisty-road database" in plain["note"] and plain["routes"][0]["name"] == "Relaxed" and plain["routes"][0]["mode"] == "twisty"
+    stops = AB() + [{"lat": LAT0 + 0.3, "lon": LON0}]
+    assert "stops in between" in planner.plan_trip(stops, "twisty", roads_conn=None)["note"] or "database" in planner.plan_trip(stops, "twisty", roads_conn=None)["note"]
+
+
+def test_loops_come_with_directions_and_the_stops_that_make_them(router):
+    out = planner.plan_loops(START, 80, roads_conn=None)
+    for route in out["routes"]:
+        assert route["maneuvers"] and route["shape6"] and route["mode"] == "loop" and route["waypoints"][0]["type"] == "break" and route["waypoints"][-1]["type"] == "break"
+        assert len(route["waypoints"]) >= 5
 
 
 def test_the_ridden_places_in_a_box_are_found_for_that_person_only(alice, bob):
@@ -370,7 +475,8 @@ def test_planning_a_loop_over_the_api(alice, router):
     body = alice.post("/api/v1/planner/loop", data=LOOP, headers=CLIENT).json()
     assert body["status"] == "ok" and body["message"] is None and body["api"] == 1 and body["routes"] and body["roads_data"] is False
     route = body["routes"][0]
-    assert set(route) == {"name", "distance_km", "duration_min", "twisty_km", "twistiness", "retraced_pct", "new_pct", "shape"} and route["shape"][0][0] == pytest.approx(LAT0, abs=1e-3)
+    assert set(route) == {"name", "distance_km", "duration_min", "twisty_km", "twistiness", "retraced_pct", "new_pct", "shape", "mode", "waypoints", "shape6", "maneuvers"}
+    assert route["shape"][0][0] == pytest.approx(LAT0, abs=1e-3)
 
 
 def test_the_loop_uses_the_road_database_when_there_is_one(alice, router, tmp_path, monkeypatch):
@@ -420,9 +526,59 @@ def test_a_busy_planner_says_so_instead_of_queueing(alice, router):
     assert alice.post("/api/v1/planner/loop", data=LOOP, headers=CLIENT).json()["status"] == "ok"                  # and the slots came back
 
 
-def test_a_to_b_over_the_api(alice, router):
-    body = alice.post("/api/v1/planner/route", data={"from_lat": LAT0, "from_lon": LON0, "to_lat": LAT0 + 0.2, "to_lon": LON0 + 0.1}, headers=CLIENT).json()
-    assert body["status"] == "ok" and len(body["routes"]) == 1 and body["routes"][0]["name"] == "Route"
+def stops(*pairs):
+    return json.dumps([{"lat": lat, "lon": lon} for lat, lon in pairs])
+
+
+TRIP = {"locations": stops((LAT0, LON0), (LAT0 + 0.2, LON0 + 0.1)), "mode": "fast"}
+
+
+def test_a_trip_over_the_api(alice, router):
+    body = alice.post("/api/v1/planner/route", data=TRIP, headers=CLIENT).json()
+    route = body["routes"][0]
+    assert body["status"] == "ok" and len(body["routes"]) == 1 and route["name"] == "Fast" and route["mode"] == "fast" and route["maneuvers"] and route["shape6"]
+    assert set(route) >= {"waypoints", "shape", "distance_km", "duration_min", "twistiness", "maneuvers", "shape6", "mode"}
+
+
+def test_the_style_alternatives_heading_and_detour_reach_the_planner(alice, router):
+    alice.post("/api/v1/planner/route", data={**TRIP, "mode": "relaxed", "alternatives": 2, "heading": 90, "paved_only": "false"}, headers=CLIENT)
+    call = router.calls[0]
+    assert call["costing_options"] == planner.mode_options("relaxed", paved_only=False) and call["alternates"] == 2 and call["heading"] == 90
+
+
+@pytest.mark.parametrize("data", [
+    {"locations": "nope"}, {"locations": "[]"}, {"locations": stops((LAT0, LON0))}, {"locations": stops((91, 8), (47, 8))}, {"locations": json.dumps([{"lat": 47}, {"lat": 47, "lon": 8}])},
+    {"locations": json.dumps([{"lat": 47, "lon": 8, "type": "teleport"}, {"lat": 47.1, "lon": 8}])}, {**TRIP, "mode": "warp"}, {**TRIP, "mode": "twisty", "detour_min": 1},
+    {**TRIP, "mode": "twisty", "detour_min": 999}, {"locations": stops(*[(47 + i * 0.1, 8) for i in range(8)])},
+])
+def test_bad_trips_are_refused_before_any_routing(alice, router, data):
+    assert alice.post("/api/v1/planner/route", data=data, headers=CLIENT).status_code in (400, 422) and router.calls == []
+
+
+def test_a_trip_needs_a_login_and_the_client_header(alice, anon, router):
+    assert anon.post("/api/v1/planner/route", data=TRIP, headers=CLIENT).status_code == 401
+    assert alice.post("/api/v1/planner/route", data=TRIP).status_code in (400, 401, 403)
+    assert router.calls == []
+
+
+def test_directions_ask_for_the_same_stops_again_with_the_turns(alice, router):
+    waypoints = json.dumps([{"lat": LAT0, "lon": LON0, "type": "break"}, {"lat": LAT0 + 0.1, "lon": LON0 + 0.05, "type": "through"}, {"lat": LAT0, "lon": LON0, "type": "break"}])
+    body = alice.post("/api/v1/planner/directions", data={"locations": waypoints, "mode": "loop", "heading": 45}, headers=CLIENT).json()
+    assert body["status"] == "ok" and body["routes"][0]["maneuvers"] and body["routes"][0]["mode"] == "loop"
+    call = router.calls[0]
+    assert call["directions"] is True and call["heading"] == 45 and call["costing_options"] is None and [l["type"] for l in call["locations"]] == ["break", "through", "break"]
+    alice.post("/api/v1/planner/directions", data={"locations": waypoints, "mode": "twisty"}, headers=CLIENT)
+    assert router.calls[1]["costing_options"] == planner.mode_options("twisty")
+    assert alice.post("/api/v1/planner/directions", data={"locations": waypoints, "mode": "warp"}, headers=CLIENT).status_code == 400
+
+
+def test_directions_say_when_nothing_can_be_found_or_the_service_is_down(alice, router):
+    data = {"locations": stops((LAT0, LON0), (LAT0 + 0.1, LON0)), "mode": "fast"}
+    router.fail_if = lambda locs: True
+    assert alice.post("/api/v1/planner/directions", data=data, headers=CLIENT).json()["status"] == "no_route"
+    router.fail_if = None
+    router.unavailable = True
+    assert alice.post("/api/v1/planner/directions", data=data, headers=CLIENT).json()["status"] == "unavailable"
 
 
 @pytest.mark.parametrize("data", [
@@ -507,3 +663,14 @@ def test_deleting_all_traces_of_a_route_does_not_touch_other_peoples(alice, bob)
     a, b = save(alice).json()["route"]["id"], save(bob).json()["route"]["id"]
     alice.delete(f"/api/v1/planner/routes/{a}", headers=CLIENT)
     assert bob.get(f"/api/v1/planner/routes/{b}").status_code == 200
+
+
+def test_a_saved_route_remembers_the_stops_that_make_it_so_it_can_be_navigated_later(alice):
+    waypoints = json.dumps([{"lat": 47.0, "lon": 8.0, "type": "break"}, {"lat": 47.05, "lon": 8.02, "type": "through"}, {"lat": 47.0, "lon": 8.0, "type": "break"}])
+    saved = save(alice, waypoints=waypoints, mode="twisty").json()["route"]
+    assert saved["mode"] == "twisty"
+    full = alice.get(f"/api/v1/planner/routes/{saved['id']}").json()["route"]
+    assert [w["type"] for w in full["waypoints"]] == ["break", "through", "break"] and full["mode"] == "twisty"
+    plain = save(alice, name="No stops").json()["route"]
+    assert alice.get(f"/api/v1/planner/routes/{plain['id']}").json()["route"]["waypoints"] is None and plain["mode"] is None
+    assert save(alice, waypoints="nope").status_code == 400 and save(alice, mode="warp").status_code == 400

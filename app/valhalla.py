@@ -159,30 +159,105 @@ def decode_polyline6(encoded: str) -> list[tuple[float, float]]:
     return coords
 
 
-def route(locations: Sequence[dict], avoid_motorways: bool = True, paved_only: bool = True) -> dict:
+def encode_polyline6(coords: Sequence[tuple[float, float]]) -> str:
+    """The polyline algorithm at 1e-6 degrees: the other way round from decode_polyline6. A whole route in a few kilobytes of text."""
+    out: list[str] = []
+    last_lat = last_lon = 0
+    for lat, lon in coords:
+        for value, last in ((round(lat * 1e6), last_lat), (round(lon * 1e6), last_lon)):
+            delta = value - last
+            delta = ~(delta << 1) if delta < 0 else delta << 1
+            while delta >= 0x20:
+                out.append(chr((0x20 | (delta & 0x1F)) + 63))
+                delta >>= 5
+            out.append(chr(delta + 63))
+        last_lat, last_lon = round(lat * 1e6), round(lon * 1e6)
+    return "".join(out)
+
+
+def _haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
+    from . import geo
+    return geo.haversine_m(a[0], a[1], b[0], b[1])
+
+
+def parse_trip(trip: dict) -> dict:
+    """One Valhalla trip as {"distance_m", "duration_s", "shape": [(lat, lon)...], "maneuvers": [...]}. `maneuvers` is empty unless the request asked for
+    instructions. Each maneuver: type (Valhalla's code), instruction (written), pre / alert / post (the sentences meant to be spoken before, at and after it),
+    street, length_m, time_s, along_m (metres from the start of the whole route), lat / lon (where it happens), leg (which stretch between stops), roundabout_exit."""
+    shape: list[tuple[float, float]] = []
+    offsets: list[int] = []
+    for leg in trip.get("legs", []):
+        part = decode_polyline6(leg.get("shape", ""))
+        offsets.append(max(0, len(shape) - 1) if shape else 0)            # the next leg starts at the last point of this one
+        shape.extend(part[1:] if shape and part else part)
+    if len(shape) < 2:
+        raise NoRoute("The map service returned an empty route.")
+    cumulative = [0.0]
+    for a, b in zip(shape, shape[1:]):
+        cumulative.append(cumulative[-1] + _haversine_m(a, b))
+    maneuvers: list[dict] = []
+    for leg_no, leg in enumerate(trip.get("legs", [])):
+        for m in leg.get("maneuvers") or []:
+            index = min(len(shape) - 1, offsets[leg_no] + int(m.get("begin_shape_index", 0)))
+            streets = m.get("street_names") or []
+            maneuvers.append({
+                "type": int(m.get("type", 0)),
+                "instruction": m.get("instruction") or "",
+                "pre": m.get("verbal_pre_transition_instruction") or m.get("instruction") or "",
+                "alert": m.get("verbal_transition_alert_instruction"),
+                "post": m.get("verbal_post_transition_instruction"),
+                "street": streets[0] if streets else None,
+                "length_m": round(float(m.get("length", 0.0)) * 1000.0),
+                "time_s": round(float(m.get("time", 0.0))),
+                "along_m": round(cumulative[index]),
+                "lat": round(shape[index][0], 6),
+                "lon": round(shape[index][1], 6),
+                "leg": leg_no,
+                "roundabout_exit": m.get("roundabout_exit_count"),
+            })
+    summary = trip.get("summary") or {}
+    return {"distance_m": float(summary.get("length", 0.0)) * 1000.0, "duration_s": float(summary.get("time", 0.0)), "shape": shape, "maneuvers": maneuvers}
+
+
+def route(locations: Sequence[dict], avoid_motorways: bool = True, paved_only: bool = True, *, costing_options: Optional[dict] = None, directions: bool = False,
+          language: str = "en-US", alternates: int = 0, heading: Optional[float] = None) -> dict:
     """A motorcycle route through the locations ({"lat", "lon", optional "type": "break" | "through"}, in order).
-    Returns {"distance_m", "duration_s", "shape": [(lat, lon), ...]}. Raises NoRoute, or ValhallaUnavailable when the service is off or down."""
+    Returns {"distance_m", "duration_s", "shape": [(lat, lon), ...], "maneuvers": [...]} (see parse_trip) and, with `alternates`, "alternates": [the same, ...] for other
+    ways between the same two points. `costing_options` replaces the avoid_motorways / paved_only settings (the planner's styles); `heading` is the direction the rider
+    is already travelling at the first location, so a new route does not start with a U-turn. Raises NoRoute, or ValhallaUnavailable when the service is off or down."""
     if not configured():
         raise ValhallaUnavailable("The map service is switched off.")
-    options: dict = {"use_trails": 0.0, "use_ferry": 0.0}
-    if avoid_motorways:
-        options.update({"exclude_highways": True, "exclude_tolls": True})
-    if paved_only:
-        options["exclude_unpaved"] = True
+    if costing_options is None:
+        costing_options = {"use_trails": 0.0, "use_ferry": 0.0}
+        if avoid_motorways:
+            costing_options.update({"exclude_highways": True, "exclude_tolls": True})
+        if paved_only:
+            costing_options["exclude_unpaved"] = True
+    stops = [dict(l) for l in locations]
+    if heading is not None and stops:
+        stops[0]["heading"] = round(heading) % 360
+        stops[0]["heading_tolerance"] = 60
+    payload: dict = {"locations": stops, "costing": "motorcycle", "costing_options": {"motorcycle": costing_options},
+                     "directions_type": "instructions" if directions else "none"}
+    if directions:
+        payload["directions_options"] = {"language": language, "units": "kilometers"}
+    if alternates > 0 and len(stops) == 2:
+        payload["alternates"] = alternates
     try:
-        answer = _post("/route", {"locations": list(locations), "costing": "motorcycle", "costing_options": {"motorcycle": options}, "directions_type": "none"})
+        answer = _post("/route", payload)
     except NoMatch as e:                                    # _post reads error codes 171/442/443 as "no match": for a route that means "no way"
         raise NoRoute(str(e)) from e
     except ValhallaUnavailable as e:
         if "(400)" in str(e):
             raise NoRoute("The map service could not find a way between those points.") from e
         raise
-    trip = answer.get("trip") or {}
-    shape: list[tuple[float, float]] = []
-    for leg in trip.get("legs", []):
-        part = decode_polyline6(leg.get("shape", ""))
-        shape.extend(part[1:] if shape and part else part)
-    summary = trip.get("summary") or {}
-    if len(shape) < 2:
-        raise NoRoute("The map service returned an empty route.")
-    return {"distance_m": float(summary.get("length", 0.0)) * 1000.0, "duration_s": float(summary.get("time", 0.0)), "shape": shape}
+    result = parse_trip(answer.get("trip") or {})
+    others = []
+    for alternate in answer.get("alternates") or []:
+        try:
+            others.append(parse_trip(alternate.get("trip") or {}))
+        except NoRoute:
+            continue
+    if others:
+        result["alternates"] = others
+    return result

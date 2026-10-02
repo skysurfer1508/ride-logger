@@ -1,11 +1,12 @@
 {
  "api": 1,
  "route": {
-  "created_at": "2026-10-02 19:36:56",
+  "created_at": "2026-10-02 20:49:03",
   "distance_km": 1.6,
   "duration_min": 60,
   "id": 1,
   "kind": "loop",
+  "mode": "loop",
   "name": "Sunday loop",
   "shape": [
    [
@@ -542,6 +543,23 @@
    ]
   ],
   "twistiness": 68,
-  "twisty_km": 1.1
+  "twisty_km": 1.1,
+  "waypoints": [
+   {
+    "lat": 47.0,
+    "lon": 8.0,
+    "type": "break"
+   },
+   {
+    "lat": 47.05,
+    "lon": 8.02,
+    "type": "through"
+   },
+   {
+    "lat": 47.0,
+    "lon": 8.0,
+    "type": "break"
+   }
+  ]
  }
 }

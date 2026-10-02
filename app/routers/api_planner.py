@@ -5,6 +5,7 @@ Planning answers with `status`: ok | unavailable (the routing service is off or 
 """
 import json
 import threading
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Response
 from fastapi.responses import JSONResponse
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/v1/planner", dependencies=[Depends(require_api_l
 CLIENT = [Depends(require_api_client)]
 MAX_SAVED = 100
 MAX_SHAPE_POINTS = 5000
+MAX_DIRECTIONS_STOPS = 40
 _slots = threading.BoundedSemaphore(2)          # a plan is 20 to 40 routing requests: two at a time is plenty for one household
 
 
@@ -78,18 +80,76 @@ def plan_loop(lat: float = Form(), lon: float = Form(), distance_km: float = For
     return _planning(work)
 
 
+def _locations(text: str, most: int) -> list[dict]:
+    """The stops of a trip from the app: JSON [{"lat", "lon", optional "type": "break" | "through"}, ...]."""
+    try:
+        raw = json.loads(text)
+        stops = [{"lat": float(p["lat"]), "lon": float(p["lon"]), "type": p.get("type", "break")} for p in raw]
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise _bad("The stops of the trip are not readable.")
+    if not 2 <= len(stops) <= most:
+        raise _bad(f"A trip needs between 2 and {most} stops.")
+    for stop in stops:
+        _point(stop["lat"], stop["lon"], "stop")
+        if stop["type"] not in ("break", "through"):
+            raise _bad("A stop is either a break or a through point.")
+    return stops
+
+
 @router.post("/route", dependencies=CLIENT)
-def plan_route(from_lat: float = Form(), from_lon: float = Form(), to_lat: float = Form(), to_lon: float = Form(), avoid_motorways: bool = Form(True),
-               paved_only: bool = Form(True), owner_sub: str = Depends(current_owner_sub)):
-    """The motorcycle route from one place to another."""
-    start, end = _point(from_lat, from_lon, "start"), _point(to_lat, to_lon, "destination")
-    return _planning(lambda: planner.plan_route(start, end, avoid_motorways=avoid_motorways, paved_only=paved_only))
+def plan_route(locations: str = Form(), mode: str = Form("fast"), paved_only: bool = Form(True), alternatives: int = Form(0), detour_min: int = Form(planner.DEFAULT_DETOUR_MIN),
+               heading: Optional[float] = Form(None), prefer_new: bool = Form(False), owner_sub: str = Depends(current_owner_sub)):
+    """From the first to the last of the stops (up to five in between), in one of four styles (ultra_fast, fast, relaxed, twisty), with the turns for turn-by-turn.
+    `alternatives` (0 to 2) asks for other ways between start and finish; `detour_min` is how much longer a twisty trip may take; `heading` is the direction you are
+    already going (for a reroute from the road)."""
+    stops = _locations(locations, planner.MAX_STOPS)
+    if mode not in planner.MODES:
+        raise _bad("Choose ultra fast, fast, relaxed or twisty.")
+    if not planner.MIN_DETOUR_MIN <= detour_min <= planner.MAX_DETOUR_MIN:
+        raise _bad(f"A detour is between {planner.MIN_DETOUR_MIN} and {planner.MAX_DETOUR_MIN} minutes.")
+
+    def work():
+        rdb = roads.connect() if (mode == "twisty" and roads.available()) else None
+        conn = get_db()
+        try:
+            ridden = None
+            if prefer_new and stops:
+                lats = [s["lat"] for s in stops]
+                lons = [s["lon"] for s in stops]
+                ridden = planner.ridden_cells(conn, owner_sub, min(lats) - 0.3, min(lons) - 0.4, max(lats) + 0.3, max(lons) + 0.4)
+            return planner.plan_trip(stops, mode, paved_only, max(0, min(2, alternatives)), detour_min, roads_conn=rdb, ridden=ridden, heading=heading, prefer_new=prefer_new)
+        finally:
+            conn.close()
+            if rdb is not None:
+                rdb.close()
+
+    return _planning(work)
+
+
+@router.post("/directions", dependencies=CLIENT)
+def directions(locations: str = Form(), mode: str = Form("relaxed"), paved_only: bool = Form(True), heading: Optional[float] = Form(None), owner_sub: str = Depends(current_owner_sub)):
+    """The same stops asked for again, with the turns: to start navigating a route that was saved or planned as a loop, and to reroute from where you are now
+    (the first stop is your position, `heading` the way you are facing). `mode` is one of the four styles, or `loop` for a loop made by the planner."""
+    stops = _locations(locations, MAX_DIRECTIONS_STOPS)
+    if mode != "loop" and mode not in planner.MODES:
+        raise _bad("Choose ultra fast, fast, relaxed, twisty or loop.")
+
+    def work():
+        extra = {"directions": True, "heading": heading}
+        if mode != "loop":
+            extra["costing_options"] = planner.mode_options(mode, paved_only)
+        route = planner._try(stops, True, paved_only, **extra)
+        if route is None:
+            raise planner.PlannerError("No route could be found between those places.")
+        return {"routes": [planner.present(route, planner.measure(route["shape"]), "Route", waypoints=stops, mode=mode)], "tried": 1}
+
+    return _planning(work)
 
 
 # ----------------------------------------------------------------------------------------------------------------------------- saved routes --
 
 def _summary(row) -> dict:
-    return {"id": row["id"], "name": row["name"], "kind": row["kind"], "distance_km": round(row["distance_m"] / 1000.0, 1), "duration_min": round(row["duration_s"] / 60.0),
+    return {"id": row["id"], "name": row["name"], "kind": row["kind"], "mode": row["mode"], "distance_km": round(row["distance_m"] / 1000.0, 1), "duration_min": round(row["duration_s"] / 60.0),
             "twisty_km": round(row["twisty_m"] / 1000.0, 1), "twistiness": row["twistiness"], "created_at": row["created_at"]}
 
 
@@ -101,7 +161,8 @@ def _own(conn, owner_sub: str, route_id: int):
 
 
 @router.post("/routes", dependencies=CLIENT)
-def save_route(name: str = Form(), kind: str = Form("loop"), shape: str = Form(), duration_s: float = Form(0.0), owner_sub: str = Depends(current_owner_sub)):
+def save_route(name: str = Form(), kind: str = Form("loop"), shape: str = Form(), duration_s: float = Form(0.0), waypoints: Optional[str] = Form(None),
+               mode: Optional[str] = Form(None), owner_sub: str = Depends(current_owner_sub)):
     """Keeps a planned route. The length and twistiness are worked out here from the line, not taken from the app."""
     name = " ".join(name.split())
     if not name or len(name) > 80:
@@ -114,6 +175,9 @@ def save_route(name: str = Form(), kind: str = Form("loop"), shape: str = Form()
         raise _bad("The route's line is not readable.")
     if not 2 <= len(points) <= MAX_SHAPE_POINTS or any(not (-90 <= a <= 90 and -180 <= b <= 180) for a, b in points):
         raise _bad("The route's line must have between 2 and 5000 points on Earth.")
+    stops = _locations(waypoints, MAX_DIRECTIONS_STOPS) if waypoints else None        # the stops that make the route, to navigate it later
+    if mode is not None and mode != "loop" and mode not in planner.MODES:
+        raise _bad("The mode of the route is not known.")
     measured = planner.measure(points)
     distance_m = sum(s["length_m"] for s in curvature.segments(points)) or sum(
         geo.haversine_m(a[0], a[1], b[0], b[1]) for a, b in zip(points, points[1:]))
@@ -122,9 +186,9 @@ def save_route(name: str = Form(), kind: str = Form("loop"), shape: str = Form()
         if conn.execute("SELECT COUNT(*) FROM planned_routes WHERE owner_sub = ?", (owner_sub,)).fetchone()[0] >= MAX_SAVED:
             raise _bad(f"You have {MAX_SAVED} saved routes: delete one first.")
         cur = conn.execute(
-            "INSERT INTO planned_routes (owner_sub, name, kind, distance_m, duration_s, twisty_m, twistiness, shape) VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO planned_routes (owner_sub, name, kind, distance_m, duration_s, twisty_m, twistiness, shape, waypoints, mode) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (owner_sub, name, kind, distance_m, max(0.0, duration_s), measured["twisty_m"], min(100, round(100.0 * measured["twist_density"])),
-             json.dumps([[round(a, 5), round(b, 5)] for a, b in points], separators=(",", ":"))),
+             json.dumps([[round(a, 5), round(b, 5)] for a, b in points], separators=(",", ":")), json.dumps(stops) if stops else None, mode),
         )
         conn.commit()
         return reply({"route": _summary(conn.execute("SELECT * FROM planned_routes WHERE id = ?", (cur.lastrowid,)).fetchone())})
@@ -149,7 +213,7 @@ def get_route(route_id: int, owner_sub: str = Depends(current_owner_sub)):
         row = _own(conn, owner_sub, route_id)
     finally:
         conn.close()
-    return reply({"route": {**_summary(row), "shape": json.loads(row["shape"])}})
+    return reply({"route": {**_summary(row), "shape": json.loads(row["shape"]), "waypoints": json.loads(row["waypoints"]) if row["waypoints"] else None}})
 
 
 @router.delete("/routes/{route_id}", dependencies=CLIENT)

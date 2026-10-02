@@ -183,6 +183,8 @@ CREATE TABLE IF NOT EXISTS planned_routes (
   twisty_m REAL NOT NULL,
   twistiness INTEGER NOT NULL,
   shape TEXT NOT NULL,
+  waypoints TEXT,                          -- JSON: the stops that make the route, so it can be navigated later
+  mode TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_planned_routes_owner ON planned_routes(owner_sub);
