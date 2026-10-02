@@ -139,7 +139,7 @@ struct SettingsView: View {
             if let last = watch.lastContact {
                 Text("Last heard from the watch \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(Theme.muted)
             }
-            if watch.link == .outOfReach || watch.link == .connected {
+            if watch.link.canTest {
                 Button { watch.testConnection() } label: {
                     HStack(spacing: 8) {
                         if watch.testing { ProgressView().controlSize(.small) }
@@ -150,6 +150,7 @@ struct SettingsView: View {
                 .disabled(watch.testing)
             }
             if let result = watch.testResult { Text(result).font(.footnote).foregroundStyle(Theme.text) }
+            if !watch.facts.isEmpty { Text(watch.facts).font(.caption2).foregroundStyle(Theme.muted) }
         }
         .onAppear { watch.refreshLink() }
     }

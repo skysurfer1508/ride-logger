@@ -150,6 +150,9 @@ struct WatchStatsStore {
 }
 
 /// Whether the phone and the Apple Watch can talk, in words. The phone reads these facts from WatchConnectivity; this turns them into one state.
+///
+/// Whether the watch app is *installed* is deliberately not part of it: iOS only reports that for watch apps embedded in the iPhone app, and this one is
+/// installed straight onto the watch from Xcode (see project.yml), so iOS says "not installed" even when it is. The only proof is the watch answering.
 enum WatchLinkState: Equatable {
     /// This device cannot be paired with a watch at all.
     case unsupported
@@ -157,18 +160,15 @@ enum WatchLinkState: Equatable {
     case starting
     /// No Apple Watch is paired with this iPhone.
     case notPaired
-    /// A watch is paired but the RideLog watch app is not on it.
-    case appNotInstalled
-    /// Installed, but the watch app is not open / the watch is out of reach right now.
+    /// Paired, but the watch is not answering right now: RideLog is not open on it, it is out of range, or the watch app is not installed.
     case outOfReach
     /// The watch can see this phone: live speed and Start / Stop work.
     case connected
 
-    static func from(supported: Bool, activated: Bool, paired: Bool, installed: Bool, reachable: Bool) -> WatchLinkState {
+    static func from(supported: Bool, activated: Bool, paired: Bool, reachable: Bool) -> WatchLinkState {
         if !supported { return .unsupported }
         if !activated { return .starting }
         if !paired { return .notPaired }
-        if !installed { return .appNotInstalled }
         return reachable ? .connected : .outOfReach
     }
 
@@ -177,8 +177,7 @@ enum WatchLinkState: Equatable {
         case .unsupported: return "Not available"
         case .starting: return "Checking…"
         case .notPaired: return "No watch paired"
-        case .appNotInstalled: return "RideLog is not on your watch"
-        case .outOfReach: return "Installed, not connected right now"
+        case .outOfReach: return "Not connected right now"
         case .connected: return "Connected"
         }
     }
@@ -188,8 +187,7 @@ enum WatchLinkState: Equatable {
         case .unsupported: return "This device cannot be paired with an Apple Watch."
         case .starting: return "Looking for your watch."
         case .notPaired: return "Pair an Apple Watch with this iPhone in the Watch app first."
-        case .appNotInstalled: return "Install it from Xcode: choose the RideLogWatch scheme, your watch as the destination, and Run (see the README)."
-        case .outOfReach: return "The watch only talks to the phone while RideLog is open on the watch and the phone is close. Open RideLog on the watch, then test again."
+        case .outOfReach: return "The watch only talks to the phone while RideLog is open on the watch and the phone is close. Open RideLog on the watch, then press Test connection. If RideLog is not on the watch yet, run the RideLogWatch scheme onto it from Xcode (see the README)."
         case .connected: return "The watch can see this phone. Live speed and Start / Stop from the wrist work."
         }
     }
@@ -197,4 +195,6 @@ enum WatchLinkState: Equatable {
     var isGood: Bool { self == .connected }
     /// Worth a chip on the Record screen: there is a watch to talk about.
     var showsOnRecordScreen: Bool { self != .unsupported && self != .notPaired }
+    /// Worth a Test connection button.
+    var canTest: Bool { self != .unsupported && self != .notPaired }
 }

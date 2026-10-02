@@ -15,6 +15,8 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
     @Published private(set) var link: WatchLinkState = .starting
     /// The last time the watch said anything (a command, or an answer to the test).
     @Published private(set) var lastContact: Date?
+    /// The raw answers iOS gives, for the Settings panel (so a surprising state can be understood).
+    @Published private(set) var facts = ""
     @Published private(set) var testing = false
     @Published private(set) var testResult: String?
 
@@ -48,8 +50,8 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
             return
         }
         let session = WCSession.default
-        link = WatchLinkState.from(supported: true, activated: session.activationState == .activated, paired: session.isPaired,
-                                   installed: session.isWatchAppInstalled, reachable: session.isReachable)
+        link = WatchLinkState.from(supported: true, activated: session.activationState == .activated, paired: session.isPaired, reachable: session.isReachable)
+        facts = "iOS says: paired \(session.isPaired ? "yes" : "no"), watch app installed \(session.isWatchAppInstalled ? "yes" : "no") (not reliable for an app put on the watch from Xcode), reachable \(session.isReachable ? "yes" : "no")"
     }
 
     /// Sends the watch a ping and says whether and how fast it answered.
@@ -57,8 +59,12 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
         refreshLink()
         testResult = nil
         let session = WCSession.default
-        guard session.activationState == .activated, session.isWatchAppInstalled, session.isReachable else {
-            testResult = link.isGood ? "The watch is not answering." : link.detail
+        guard session.activationState == .activated, session.isPaired else {
+            testResult = link.detail
+            return
+        }
+        guard session.isReachable else {
+            testResult = "The watch cannot be reached. Open RideLog on the watch, keep the phone close, and try again."
             return
         }
         testing = true
@@ -91,7 +97,7 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
 
     private func tick() {
         let session = WCSession.default
-        guard session.activationState == .activated, session.isWatchAppInstalled, let recorder else { return }
+        guard session.activationState == .activated, session.isPaired, let recorder else { return }
         let now = Date()
         let recording = recorder.isRecording
         let changed = recording != lastRecording
@@ -119,7 +125,7 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
         do {
             let home: HomeResponse = try await api.get("home")
             stats = WatchStats(weekKm: home.weekKm ?? 0, lastRideKm: home.latest?.distanceKm, lastRideAt: home.latest.flatMap { Format.parseISO($0.startTime) }, updatedAt: Date())
-            if let current = snapshot(now: Date()), WCSession.default.activationState == .activated, WCSession.default.isWatchAppInstalled {
+            if let current = snapshot(now: Date()), WCSession.default.activationState == .activated, WCSession.default.isPaired {
                 pushContext(current)
                 lastContext = Date()
             }

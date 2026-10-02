@@ -117,36 +117,38 @@ final class WatchProtocolTests: XCTestCase {
     // MARK: link state
 
     func testTheLinkStateFollowsTheFactsInOrder() {
-        func state(_ supported: Bool = true, _ activated: Bool = true, _ paired: Bool = true, _ installed: Bool = true, _ reachable: Bool = true) -> WatchLinkState {
-            WatchLinkState.from(supported: supported, activated: activated, paired: paired, installed: installed, reachable: reachable)
+        func state(_ supported: Bool = true, _ activated: Bool = true, _ paired: Bool = true, _ reachable: Bool = true) -> WatchLinkState {
+            WatchLinkState.from(supported: supported, activated: activated, paired: paired, reachable: reachable)
         }
         XCTAssertEqual(state(false), .unsupported)
         XCTAssertEqual(state(true, false), .starting)
         XCTAssertEqual(state(true, true, false), .notPaired)
-        XCTAssertEqual(state(true, true, true, false), .appNotInstalled)
-        XCTAssertEqual(state(true, true, true, true, false), .outOfReach)
+        XCTAssertEqual(state(true, true, true, false), .outOfReach)
         XCTAssertEqual(state(), .connected)
-        XCTAssertEqual(state(true, true, false, false, true), .notPaired)                    // the first missing thing is the one reported
-        XCTAssertEqual(state(false, false, false, false, false), .unsupported)
+        XCTAssertEqual(state(true, true, false, true), .notPaired)                           // the first missing thing is the one reported
+        XCTAssertEqual(state(false, false, false, false), .unsupported)
     }
 
     func testEveryStateSaysWhatToDoAndOnlyConnectedIsGood() {
-        let all: [WatchLinkState] = [.unsupported, .starting, .notPaired, .appNotInstalled, .outOfReach, .connected]
+        let all: [WatchLinkState] = [.unsupported, .starting, .notPaired, .outOfReach, .connected]
         for state in all {
             XCTAssertFalse(state.title.isEmpty)
             XCTAssertFalse(state.detail.isEmpty)
             XCTAssertEqual(state.isGood, state == .connected)
         }
-        XCTAssertTrue(WatchLinkState.appNotInstalled.detail.contains("RideLogWatch"))
         XCTAssertTrue(WatchLinkState.outOfReach.detail.contains("Open RideLog on the watch"))
+        XCTAssertTrue(WatchLinkState.outOfReach.detail.contains("RideLogWatch"))
     }
 
-    func testTheRecordScreenOnlyMentionsAWatchThatExists() {
-        XCTAssertFalse(WatchLinkState.unsupported.showsOnRecordScreen)
-        XCTAssertFalse(WatchLinkState.notPaired.showsOnRecordScreen)
-        XCTAssertTrue(WatchLinkState.appNotInstalled.showsOnRecordScreen)
-        XCTAssertTrue(WatchLinkState.outOfReach.showsOnRecordScreen)
-        XCTAssertTrue(WatchLinkState.connected.showsOnRecordScreen)
+    func testTheTestButtonAndChipAreForAWatchThatExists() {
+        for state in [WatchLinkState.unsupported, .notPaired] {
+            XCTAssertFalse(state.showsOnRecordScreen)
+            XCTAssertFalse(state.canTest)
+        }
+        for state in [WatchLinkState.starting, .outOfReach, .connected] {
+            XCTAssertTrue(state.showsOnRecordScreen)
+            XCTAssertTrue(state.canTest)                                                    // also when "installed" is not reported: the test is the proof
+        }
     }
 
     func testThePingKeysAreWhatBothSidesUse() {
