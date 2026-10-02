@@ -42,6 +42,7 @@ struct MainTabs: View {
     /// One recorder for the whole app: a ride keeps recording whichever tab is open.
     @StateObject private var recorder: RideRecorder
     @State private var selected: AppTab = .home
+    @ObservedObject private var navigation = AppServices.shared.navigation
     @Environment(\.scenePhase) private var scenePhase
 
     init(api: APIClient, auth: AuthService) {
@@ -69,6 +70,9 @@ struct MainTabs: View {
                 .tag(AppTab.settings)
         }
         .tint(Theme.accent)
+        .fullScreenCover(isPresented: Binding(get: { navigation.isActive }, set: { if !$0 { navigation.end() } })) {
+            NavigationScreen(nav: navigation)
+        }
         .onChange(of: scenePhase) { _, phase in
             // back in the app: make sure the phone is linked to the account and anything waiting goes up
             if phase == .active {

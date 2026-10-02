@@ -52,6 +52,8 @@ struct PlannerView: View {
     @State private var busy = false
     @State private var confirmDelete: SavedRouteSummary?
     @State private var noRoadData = false
+    @State private var recordToo = true
+    @ObservedObject private var navigation = AppServices.shared.navigation
 
     var body: some View {
         NavigationStack {
@@ -307,6 +309,22 @@ struct PlannerView: View {
     }
 
     private func actions(for route: PlannedRoute) -> some View {
+        VStack(spacing: 8) {
+            Button { Task { await navigate(route) } } label: {
+                Label(navigation.loading ? "Getting the turns…" : "Navigate with voice", systemImage: "location.north.fill").frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent).tint(Color(hex: 0x3478F6)).disabled(navigation.loading)
+            Toggle("Record this ride too", isOn: $recordToo).tint(Theme.accent).foregroundStyle(Theme.text).font(.footnote)
+            Button { Task { await navigate(route, simulate: true) } } label: {
+                Label("Simulate the drive (hear the voice from the couch)", systemImage: "play.circle").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered).font(.footnote).disabled(navigation.loading)
+            if let problem = navigation.problem { Text(problem).font(.footnote).foregroundStyle(Theme.accent) }
+            routeActions(for: route)
+        }
+    }
+
+    private func routeActions(for route: PlannedRoute) -> some View {
         HStack(spacing: 8) {
             Button { follow(route) } label: { Label("Follow", systemImage: "location.north.line.fill").frame(maxWidth: .infinity) }.buttonStyle(.borderedProminent)
             Button { Task { await save(route, thenShare: false) } } label: { Label("Save", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity) }.buttonStyle(.bordered).disabled(busy)
@@ -325,7 +343,8 @@ struct PlannerView: View {
                         Text(route.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text)
                         Text(PlannerLogic.summary(route)).font(.caption).foregroundStyle(Theme.muted)
                         HStack(spacing: 8) {
-                            Button("Follow") { Task { await followSaved(route) } }.buttonStyle(.borderedProminent)
+                            Button("Navigate") { Task { await navigateSaved(route) } }.buttonStyle(.borderedProminent).tint(Color(hex: 0x3478F6))
+                            Button("Follow") { Task { await followSaved(route) } }.buttonStyle(.bordered)
                             Button("GPX") { Task { await share(route) } }.buttonStyle(.bordered)
                             Button("Delete", role: .destructive) { confirmDelete = route }.buttonStyle(.bordered)
                         }
@@ -380,6 +399,25 @@ struct PlannerView: View {
     private func routeName(_ route: PlannedRoute) -> String {
         if mode == .route, let destination { return "To \(destination.name) (\(RouteMode(rawValue: route.mode ?? "")?.title ?? "Route"))" }
         return PlannerLogic.defaultName(kind: mode == .loop ? "loop" : "route", km: route.distanceKm, now: Date())
+    }
+
+    /// Gets the route ready, closes this sheet, and only then opens the navigation screen (two presentations at once would fight).
+    private func navigate(_ route: PlannedRoute, simulate: Bool = false) async {
+        guard let ready = await navigation.prepare(route: route, name: routeName(route), api: api) else { notice = navigation.problem; return }
+        await open(ready, simulate: simulate)
+    }
+
+    private func navigateSaved(_ route: SavedRouteSummary) async {
+        guard let ready = await navigation.prepare(saved: route, api: api) else { notice = navigation.problem; return }
+        await open(ready, simulate: false)
+    }
+
+    private func open(_ ready: GuidanceRoute, simulate: Bool) async {
+        let record = recordToo && !simulate
+        let navigation = self.navigation
+        dismiss()
+        try? await Task.sleep(nanoseconds: 450_000_000)
+        await navigation.start(ready, record: record, simulate: simulate)
     }
 
     private func follow(_ route: PlannedRoute) {

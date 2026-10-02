@@ -54,7 +54,7 @@ enum RouteFollow {
     }
 
     /// The nearest point of segment `i` to the position: (metres away, metres along the whole route).
-    private static func nearest(on line: Line, segment i: Int, lat: Double, lon: Double) -> (distance: Double, along: Double) {
+    static func nearest(on line: Line, segment i: Int, lat: Double, lon: Double) -> (distance: Double, along: Double) {
         let cosLat = cos(line.lat[i] * .pi / 180)
         let bx = (line.lon[i + 1] - line.lon[i]) * cosLat * metresPerDegree
         let by = (line.lat[i + 1] - line.lat[i]) * metresPerDegree

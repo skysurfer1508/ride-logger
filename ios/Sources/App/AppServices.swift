@@ -12,6 +12,8 @@ final class AppServices {
     let autoStart: AutoStartCoordinator
     /// The planned route being followed, if any (shown on the Traffic and Record maps).
     let activeRoute = ActiveRouteModel()
+    /// Turn-by-turn navigation along a planned route, with the voice.
+    let navigation = NavigationModel()
 
     private init() {
         let api = APIClient()

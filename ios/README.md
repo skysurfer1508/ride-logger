@@ -265,8 +265,28 @@ Traffic tab > **Plan** (top left). Two tabs: **Trip** (A to B, like Maps) and **
 - **Loop:** as before (a length, from where you are or from an address, avoid motorways, paved only, prefer roads you have not ridden).
 - **Results:** up to three routes on a map with distance, time, twisty km and a score; pick one. **Follow** puts it on the Traffic and Record maps in blue with distance along and off the route;
   **Save** keeps it on your server together with the stops and the style that make it (so it can be ridden again with directions); **GPX** saves and opens the share sheet.
-- Every route now comes with its **turns** (the server asks Valhalla for directions, in English) and a full-resolution line; the voice guidance that uses them is the next release.
+- Every route comes with its **turns** (the server asks Valhalla for directions, in English) and a full-resolution line: that is what the voice navigation below uses.
 - Needs Valhalla running (see the limits section); the road database is only needed for Twisty and loops through twisty roads. If the routing service is busy or down the sheet says so.
+
+## Navigate with voice (turn by turn, through the helmet)
+
+After planning (Trip or Loop), **Navigate with voice** closes the planner and opens a full-screen display; saved routes have a **Navigate** button too (a route saved before 2.1 has no stops to
+navigate: plan it again and save the new one). *Record this ride too* (on by default) starts the ride recording at the same moment, as the helmet Shortcut would.
+
+- **What it says** (English, from Valhalla's sentences, tidied): at the start "Starting navigation. Drive east on Bahnhofquai. Then bear right onto Central."; a heads-up about **45 seconds**
+  before a turn (never less than 600 m: "In 600 meters, turn right onto Schaffhauserplatz"; "In 1 kilometer" at 90 km/h) and a short cue about **12 seconds** before ("Turn right onto
+  Schaffhauserplatz."); on a long straight an early "In 2 kilometers, enter the roundabout and take the 2nd exit ..." and "Continue for 12 kilometers."; "Your stop is ahead" and "You have reached your stop"
+  for stops in between; "You will arrive at your destination" and "You have arrived". Road numbers are not read out. A turn is said once; two turns close together share a sentence.
+- **Off route** (more than 100 m for 5 seconds at riding speed): "Off route. Recalculating." and the phone asks your server for a new route from where you are (same style, remaining stops, and the way
+  you are facing so it does not send you into a U-turn), then "Route updated." With no signal: "No connection. Follow the blue line.", and it tries again every 15 seconds; the old route and its turns keep
+  working without data, only rerouting needs the server. Parking up or standing still never counts as off route; stopping within 60 m of the destination counts as arrived.
+- **Screen:** the next turn as a big arrow with distance and street, kilometres and time left, arrival time, speed, *Voice on/off* and *End*. Nothing needs touching while riding.
+- **The voice and your intercom:** it speaks through whatever the phone is sending sound to, with music turned down while it talks. **Settings > Voice guidance** has *Test voice* (says a sample sentence and tells you
+  **where it went**, e.g. "Sena 50S (Bluetooth, call quality)", and warns if it is only the phone's own speaker), a speed slider, and **Intercom compatibility**: if the voice does not come through the intercom,
+  turn it on (it uses the call profile every headset understands, at lower sound quality). Better English voices can be downloaded in iPhone Settings > Accessibility > Spoken Content > Voices; the best installed one is used.
+- **With the phone locked in the bag:** location was already allowed in the background; the app now also has the *audio* background mode so it can speak with the screen locked.
+- **Simulate the drive:** in the planner, *Simulate the drive* rides the route in the phone at 50 km/h (or 90, with *Skip 2 km*): you hear the whole sequence from the couch, see the banner and map move, and nothing is recorded.
+- Honest limits: the voice over an intercom and with the phone locked are proven only on your bike (that is what the checklist below is for); rerouting needs data; no offline maps; Valhalla's wording is good but not Google-grade.
 
 ## GPX export and import
 
@@ -344,6 +364,13 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
    "tap to start" notification appear? Open Settings > Auto-start log and look for "watch": it says what happened. Tell Claude what you see.
 4. During a ride: is the speed on the wrist within a second or two of the phone? Walk away from the phone: "Waiting for iPhone..." should appear after about 12 seconds.
 5. Stop from the wrist: it asks, then the ride finishes and uploads. Add the complication to a watch face: it shows this week's km.
+
+**Navigation with voice**
+1. At home, Settings > Voice guidance > **Test voice**: you hear the sentence. With the helmet connected, does the text say it went to the helmet (not "the phone's speaker")? If it is silent in the helmet, turn on Intercom compatibility and test again.
+2. Plan a trip, then **Simulate the drive**: does it sound right? Is a turn announced early enough at 50 and at 90 km/h? Does it say anything silly (a road number, a double announcement)? Tell Claude the exact sentence.
+3. A real short ride, **Navigate with voice** with the phone in the tank bag or pocket and the screen locked: do you hear the turns in the helmet at the right moments? Music (if any) should dip while it speaks.
+4. Take a wrong turn on purpose: "Off route. Recalculating." within a few seconds, then "Route updated." and a sensible new route (not a U-turn). Try it once with mobile data off: "No connection. Follow the blue line."
+5. Arrive: "You have arrived at your destination." Does the ride (if recorded) appear under Rides as usual?
 
 **Trip planner**
 1. Traffic > Plan > Trip: From says "My location". Tap To, type a street and number you know: suggestions appear as you type; pick one. Does it find your address? Try a town, a pass, a shop.

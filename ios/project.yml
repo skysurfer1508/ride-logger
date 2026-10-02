@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "2.1"
-    CURRENT_PROJECT_VERSION: "15"
+    MARKETING_VERSION: "2.2"
+    CURRENT_PROJECT_VERSION: "16"
 targets:
   RideLog:
     type: application
@@ -45,6 +45,7 @@ targets:
         NSSupportsLiveActivities: true                 # speed and distance on the Lock Screen and in the Dynamic Island
         UIBackgroundModes:
           - location                                   # keep recording a ride with the screen locked
+          - audio                                      # the navigation voice speaks with the phone locked in the bag
         NSLocationWhenInUseUsageDescription: RideLog uses your location while you record a ride, to draw the route and work out distance and speed. It keeps recording with the screen locked until you press Stop. The Traffic tab uses it to show where you are on the map. Your rides are uploaded only to your own server.
         NSLocationAlwaysAndWhenInUseUsageDescription: RideLog can notice that you started riding while the app is closed, and then start recording for you. This only happens if you turn on "Notice when I start riding" in Settings. Nothing is recorded until a ride starts, and rides go only to your own server.
         NSMotionUsageDescription: RideLog asks the motion sensor whether you are in a vehicle, so that it does not start recording when you are only walking.
@@ -158,6 +159,8 @@ targets:
       - Sources/Core/PlannerLogic.swift
       - Sources/Core/RouteFollow.swift
       - Sources/Core/Polyline6.swift
+      - Sources/Core/GuidanceEngine.swift
+      - Sources/Core/VoiceSettings.swift
       - Sources/Core/TripLogic.swift
       - Shared/WatchProtocol.swift
       - Sources/AutoStart/AutoStartLogic.swift

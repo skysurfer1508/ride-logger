@@ -10,6 +10,11 @@ struct SettingsView: View {
     @AppStorage("keepScreenOn") private var keepScreenOn = true
     @AppStorage(InsightsLogic.showLimitsKey) private var showSpeedLimits = true
     @ObservedObject private var watch = WatchBridge.shared
+    @ObservedObject private var speech = SpeechOutput.shared
+    @AppStorage(VoiceSettings.enabledKey) private var voiceOn = true
+    @AppStorage(VoiceSettings.rateKey) private var voiceRate = VoiceSettings.defaultRate
+    @AppStorage(VoiceSettings.compatibilityKey) private var voiceCompat = false
+    @State private var voiceRoute = ""
     @State private var localRides: [RideRecorder.LocalRide] = []
     @State private var deleteTarget: RideRecorder.LocalRide?
 
@@ -57,6 +62,7 @@ struct SettingsView: View {
                     accountPanel
                     recordingPanel
                     insightsPanel
+                    voicePanel
                     watchPanel
                     AutoStartPanel(coordinator: autoStart, recorder: recorder)
                     dataPanel
@@ -124,6 +130,36 @@ struct SettingsView: View {
                     confirmSignOut = true
                 }
             }
+        }
+    }
+
+    private var voicePanel: some View {
+        Panel(title: "Voice guidance") {
+            Toggle("Speak the directions", isOn: $voiceOn).tint(Theme.accent).foregroundStyle(Theme.text)
+            HStack {
+                Text("Speed").font(.footnote).foregroundStyle(Theme.muted)
+                Slider(value: $voiceRate, in: VoiceSettings.rateRange).tint(Theme.accent).accessibilityLabel("Speaking speed")
+            }
+            Toggle("Intercom compatibility", isOn: $voiceCompat).tint(Theme.accent).foregroundStyle(Theme.text)
+            Text("Turn this on only if the voice does not come through your helmet intercom: it uses the call profile, which every headset understands, at lower sound quality.")
+                .font(.footnote).foregroundStyle(Theme.muted)
+            Button {
+                speech.test()
+                Task {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    voiceRoute = speech.currentRoute()
+                }
+            } label: { Label("Test voice", systemImage: "speaker.wave.2.fill") }
+                .buttonStyle(.bordered)
+            if !voiceRoute.isEmpty {
+                Text("The voice goes to: \(voiceRoute)").font(.footnote).foregroundStyle(Theme.text)
+                if VoiceSettings.isPhoneSpeaker(speech.outputs()) {
+                    Text("That is the phone itself, not your intercom. Connect the helmet in Bluetooth settings first; if it is connected, try Intercom compatibility.")
+                        .font(.footnote).foregroundStyle(Theme.accent)
+                }
+            }
+            Text("The best English voice installed is used. Better ones can be downloaded in iPhone Settings > Accessibility > Spoken Content > Voices.")
+                .font(.caption2).foregroundStyle(Theme.muted)
         }
     }
 
