@@ -1,4 +1,5 @@
 import Charts
+import Combine
 import MapKit
 import SwiftUI
 
@@ -6,6 +7,8 @@ import SwiftUI
 struct ColoredRoute: Identifiable {
     let id: Int
     let bucket: Int
+    /// The fixes this run covers (both ends included).
+    let range: ClosedRange<Int>
     let coordinates: [CLLocationCoordinate2D]
 }
 
@@ -29,11 +32,20 @@ final class TrackModel: ObservableObject {
     let chartPoints: [TrackPoint]
     @Published var cursor: Double = 0
 
+    // MARK: replay
+    /// True from the first press of Play until "Done": the route is dimmed and the part already ridden is drawn in colour behind the bike.
+    @Published var replayActive = false
+    @Published var isPlaying = false
+    @Published var rate = Replay.defaultRate
+    @Published var follow = true
+    private var timer: Timer?
+    private var lastTick = Date()
+
     init(track: TrackResponse) {
         self.track = track
         coords = track.points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
         routes = TrackMath.segments(track.points).enumerated().map { index, segment in
-            ColoredRoute(id: index, bucket: segment.bucket, coordinates: Array(track.points[segment.range].map {
+            ColoredRoute(id: index, bucket: segment.bucket, range: segment.range, coordinates: Array(track.points[segment.range].map {
                 CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
             }))
         }
@@ -46,6 +58,64 @@ final class TrackModel: ObservableObject {
     var sample: TrackMath.Sample? { TrackMath.sample(at: cursor, in: track.points) }
 
     func select(time: Double) { cursor = min(max(0, time), duration) }
+
+    func play() {
+        guard duration > 0 else { return }
+        cursor = Replay.startPosition(cursor: cursor, duration: duration)
+        replayActive = true
+        isPlaying = true
+        lastTick = Date()
+        timer?.invalidate()
+        let t = Timer(timeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+        RunLoop.main.add(t, forMode: .common)         // .common: keeps ticking while the person drags the slider or the map
+        timer = t
+    }
+
+    func pause() {
+        isPlaying = false
+        timer?.invalidate()
+        timer = nil
+    }
+
+    func restart() {
+        cursor = 0
+        if replayActive && !isPlaying { play() }
+    }
+
+    /// Leaves replay mode: the route is drawn normally again.
+    func finishReplay() {
+        pause()
+        replayActive = false
+    }
+
+    private func tick() {
+        guard isPlaying else { return }
+        let now = Date()
+        let step = Replay.advance(cursor: cursor, elapsed: now.timeIntervalSince(lastTick), rate: rate, duration: duration)
+        lastTick = now
+        cursor = step.cursor
+        if step.finished { pause() }
+    }
+
+    /// The part of the route already ridden, in its speed colours, ending at the bike.
+    func trail(upTo s: TrackMath.Sample) -> [ColoredRoute] {
+        var out: [ColoredRoute] = []
+        for route in routes {
+            if route.range.upperBound <= s.index {
+                out.append(route)
+            } else if route.range.lowerBound <= s.index {
+                var part = Array(coords[route.range.lowerBound...s.index])
+                part.append(CLLocationCoordinate2D(latitude: s.lat, longitude: s.lon))
+                out.append(ColoredRoute(id: route.id, bucket: route.bucket, range: route.range, coordinates: part))
+                break
+            } else {
+                break
+            }
+        }
+        return out
+    }
 
     func wallClock(_ seconds: Double) -> String? {
         startDate.map { Format.time($0.addingTimeInterval(seconds)) }
@@ -68,6 +138,10 @@ struct RideTrackContent: View {
     }
 
     var body: some View {
+        content.onDisappear { model.pause() }
+    }
+
+    private var content: some View {
         VStack(spacing: 14) {
             header
             if track.points.count < 2 {
@@ -111,7 +185,13 @@ struct RideTrackContent: View {
             MapReader { proxy in
                 Map(position: $camera) {
                     ForEach(model.routes) { route in
-                        MapPolyline(coordinates: route.coordinates).stroke(SpeedColors.color(route.bucket), lineWidth: 5)
+                        MapPolyline(coordinates: route.coordinates)
+                            .stroke(SpeedColors.color(route.bucket).opacity(model.replayActive ? 0.25 : 1), lineWidth: 5)
+                    }
+                    if model.replayActive, let s = model.sample {
+                        ForEach(model.trail(upTo: s)) { route in
+                            MapPolyline(coordinates: route.coordinates).stroke(SpeedColors.color(route.bucket), lineWidth: 6)
+                        }
                     }
                     ForEach(track.stops) { stop in
                         Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lon), anchor: .center) {
@@ -140,6 +220,17 @@ struct RideTrackContent: View {
             .frame(height: 380)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border, lineWidth: 1))
+            .overlay(alignment: .bottom) {
+                if model.replayActive, let s = model.sample {
+                    ReplayHUD(speed: s.kmh, clock: Format.clock(seconds: s.t), wallClock: model.wallClock(s.t), km: Format.km(fromMeters: s.dist),
+                              stop: TrackMath.stop(at: s.t, in: track.stops))
+                        .padding(8)
+                }
+            }
+            .onReceive(model.$cursor.throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)) { _ in
+                // the follow-camera: re-centre on the bike a few times a second (not every tick, which would fight the map's own animation)
+                if model.isPlaying && model.follow, let s = model.sample { centre(on: s) }
+            }
 
             HStack(spacing: 10) {
                 ForEach(SpeedColors.all.indices, id: \.self) { i in
@@ -151,7 +242,8 @@ struct RideTrackContent: View {
                 Text("km/h").font(.caption2).foregroundStyle(Theme.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Tap the route to see the speed at that spot.").font(.caption).foregroundStyle(Theme.muted)
+            Text(model.replayActive ? "Replay: the colour behind the bike is the part already ridden." : "Tap the route to see the speed at that spot.")
+                .font(.caption).foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -180,6 +272,7 @@ struct RideTrackContent: View {
                     Label("Standing still here: \(stop.label)", systemImage: "pause.circle.fill")
                         .font(.footnote).foregroundStyle(Theme.accent)
                 }
+                replayControls
                 Slider(value: $model.cursor, in: 0...max(1, model.duration)).tint(Theme.accent)
                     .accessibilityLabel("Position in the ride")
                 HStack(spacing: 10) {
@@ -191,6 +284,53 @@ struct RideTrackContent: View {
                 .font(.footnote)
             }
         }
+    }
+
+    // MARK: replay
+
+    private var replayControls: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                Button { model.restart() } label: { Image(systemName: "backward.end.fill").frame(width: 34, height: 34) }
+                    .accessibilityLabel("Back to the start")
+                Button {
+                    if model.isPlaying {
+                        model.pause()
+                    } else {
+                        model.play()
+                        if model.follow, let s = model.sample { centre(on: s) }
+                    }
+                } label: {
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title2)
+                        .frame(width: 54, height: 40)
+                        .background(Theme.accent, in: Capsule())
+                        .foregroundStyle(Color.black)
+                }
+                .accessibilityLabel(model.isPlaying ? "Pause the replay" : "Replay the ride")
+                HStack(spacing: 6) {
+                    ForEach(Replay.rates, id: \.self) { rate in
+                        Button(Replay.label(rate)) { model.rate = rate }
+                            .font(.footnote.weight(.semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 6)
+                            .background(model.rate == rate ? Theme.accent : Theme.border.opacity(0.5), in: Capsule())
+                            .foregroundStyle(model.rate == rate ? Color.black : Theme.text)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            if model.replayActive {
+                HStack {
+                    Toggle("Follow the bike", isOn: $model.follow).tint(Theme.accent).font(.footnote)
+                    Button("Done") {
+                        model.finishReplay()
+                        resetCamera()
+                    }
+                    .buttonStyle(.bordered).font(.footnote)
+                }
+            }
+        }
+        .foregroundStyle(Theme.text)
     }
 
     // MARK: speed over time
@@ -255,6 +395,16 @@ struct RideTrackContent: View {
     }
 
     // MARK: moving around
+
+    private func centre(on s: TrackMath.Sample) {
+        camera = .camera(MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: s.lat, longitude: s.lon), distance: 700))
+    }
+
+    private func resetCamera() {
+        if let fit = MapFit.rect(for: [model.coords]) {
+            withAnimation { camera = .rect(fit) }
+        }
+    }
 
     private func jump(to stop: RideStop) {
         model.select(time: (stop.tStart + stop.tEnd) / 2)
@@ -362,5 +512,36 @@ struct CursorMarker: View {
                 .foregroundStyle(Theme.text)
             Circle().fill(Theme.accent).frame(width: 14, height: 14).overlay(Circle().stroke(Color.white, lineWidth: 2.5))
         }
+    }
+}
+
+/// Speed, time and distance over the bottom of the map while replaying.
+struct ReplayHUD: View {
+    let speed: Int
+    let clock: String
+    let wallClock: String?
+    let km: String
+    let stop: RideStop?
+
+    var body: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 14) {
+            HStack(alignment: .lastTextBaseline, spacing: 3) {
+                Text("\(speed)").font(Theme.readout(40, weight: .bold)).foregroundStyle(Theme.text)
+                Text("km/h").font(Theme.label).foregroundStyle(Theme.accent)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(wallClock.map { "\($0) · \(clock)" } ?? clock).font(.system(size: 13, weight: .semibold, design: .monospaced))
+                Text("\(km) km").font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.muted)
+            }
+            Spacer(minLength: 0)
+            if let stop {
+                Label(stop.label, systemImage: "pause.circle.fill").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+            }
+        }
+        .foregroundStyle(Theme.text)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Theme.bg.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Replay: \(speed) kilometres per hour, \(km) kilometres ridden")
     }
 }

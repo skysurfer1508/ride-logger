@@ -51,6 +51,26 @@ banner shows dashes instead of a frozen speed, and it is removed the next time y
 It needs Live Activities to be on (iPhone Settings > RideLog > Live Activities; Settings > Recording in the app says whether they are). Recording works
 exactly the same without it. It runs in its own extension target (`RideLogWidgets`); if that target ever breaks the build, `project.yml` says what to delete.
 
+## The ride screen: speed map, stops, replay
+
+Tap a ride (Home, Rides, Overview records) to open it.
+
+- **Speed map.** The route is drawn in five colours by speed (under 15, 15-40, 40-70, 70-100, 100+ km/h). **Tap the route**, drag the slider, or touch the
+  speed chart to see the exact position, speed, distance ridden so far, altitude and clock time at that spot. The top speed is pinned on the map.
+- **Stops.** Every time you stood still for 8 seconds or more is marked with its wait, and listed under **Stops** (tap one to jump to it). Each is
+  matched to OpenStreetMap: **Traffic light**, **Stop sign**, **Level crossing**, **Give way**, or **Traffic / other** when nothing like that is within
+  35 m (a queue, a jam). A wait right after pressing Start or right before Stop is not counted (getting going / parking).
+- **Replay.** Press play: the bike moves along the route (1x, 4x, 10x or 30x real time), the part already ridden is drawn in colour behind it, a display
+  over the map shows speed, time and distance, and the camera follows the bike (switch **Follow the bike** off to pan and zoom yourself; **Done** leaves the replay).
+  Waits at lights are shown at the same speed as everything else, so a 1-minute red takes 6 seconds at 10x.
+
+Where the stop information comes from: the **server** asks the public OpenStreetMap Overpass API for map tiles of about 4 x 5.5 km around the places you
+stopped and keeps them for 60 days, so a tile is fetched once. Your phone never contacts it, and only those coarse tile corners leave your server.
+If Overpass is busy or down, the stops show as plain "Stop" and a note says so; pull down to try again. Signals not mapped in OSM show as "Traffic / other",
+and a queue that passes a signal you did not wait for can be mislabelled, so treat the labels as a good guess, not a record. Map data (c) OpenStreetMap
+contributors, shown under the stops. Server settings: `OSM_ENABLED`, `OSM_USER_AGENT` (put a contact email in it, the public servers ask for that),
+`OVERPASS_URLS` (see `.env.example`).
+
 ## Deleting rides
 
 Rides > swipe a ride to the left > **Delete**, or open a ride and tap the trash icon. Both ask first. Deleting removes the ride **and its GPS points** from
@@ -89,6 +109,16 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 4. Start a ride, force-quit the app: the banner goes to dashes after about 20 seconds; opening the app removes it.
 5. iPhone Settings > RideLog > Live Activities off: recording still works, and Settings > Recording says why there is no banner.
 
+**Ride screen (needs the server restarted on the new version first)**
+1. Open a ride: the route is coloured by speed, with a legend. A ride from before you used the app (Overland) works too.
+2. Tap the route in a few places: the dot and the card show that spot's speed. Do the corners look slower, the straights faster? Is the top-speed pin near
+   where you remember it, and does its number equal "Max speed" in the stats?
+3. Drag the slider and drag over the speed chart: the dot follows on the map. Tap "Top speed", "Start", "End".
+4. Stops: is every red light you remember there, with roughly the right wait? Are lights labelled "Traffic light" and queues "Traffic / other"?
+   Tap a stop: the map jumps to it. Is a stop missing or invented, or a label wrong? Note where and tell Claude.
+5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
+6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
+
 **Deleting**
 1. Rides: swipe a ride left, tap Delete, confirm. It disappears, and Home and Overview totals drop by that ride (the website too).
 2. Open a ride, tap the trash icon, confirm: you land back on the list without it.
@@ -96,5 +126,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-Automatic start and stop, a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website. Next rounds, once
+Automatic start and stop, a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+traffic cameras. Next rounds, once
 Start/Stop is proven on the road.

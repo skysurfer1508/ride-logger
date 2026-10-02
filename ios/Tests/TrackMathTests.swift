@@ -152,3 +152,44 @@ final class TrackMathTests: XCTestCase {
 
 /// The number of colours the route legend has (UI/SpeedColors lives in the SwiftUI part of the app, which the tests do not compile).
 private enum SpeedColorsCount { static let value = 5 }
+
+final class ReplayTests: XCTestCase {
+    func testTimeMovesByRateTimesElapsed() {
+        let r = Replay.advance(cursor: 10, elapsed: 0.1, rate: 10, duration: 100)
+        XCTAssertEqual(r.cursor, 11, accuracy: 1e-9)
+        XCTAssertFalse(r.finished)
+        XCTAssertEqual(Replay.advance(cursor: 0, elapsed: 0.2, rate: 1, duration: 100).cursor, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(Replay.advance(cursor: 0, elapsed: 0.2, rate: 30, duration: 100).cursor, 6, accuracy: 1e-9)
+    }
+
+    func testItStopsExactlyAtTheEnd() {
+        let r = Replay.advance(cursor: 99.5, elapsed: 0.1, rate: 30, duration: 100)
+        XCTAssertEqual(r.cursor, 100)
+        XCTAssertTrue(r.finished)
+        XCTAssertTrue(Replay.advance(cursor: 90, elapsed: 0.25, rate: 40, duration: 100).finished)       // lands exactly on the end
+    }
+
+    func testALateTickDoesNotJumpTheWholePause() {
+        // the app was suspended for 5 s: the replay moves 0.25 s of real time, not 5 s
+        XCTAssertEqual(Replay.advance(cursor: 0, elapsed: 5, rate: 10, duration: 1000).cursor, 2.5, accuracy: 1e-9)
+    }
+
+    func testNothingMovesWithoutTimeOrARate() {
+        XCTAssertEqual(Replay.advance(cursor: 7, elapsed: 0, rate: 10, duration: 100).cursor, 7)
+        XCTAssertEqual(Replay.advance(cursor: 7, elapsed: -1, rate: 10, duration: 100).cursor, 7)
+        XCTAssertEqual(Replay.advance(cursor: 7, elapsed: 0.1, rate: 0, duration: 100).cursor, 7)
+    }
+
+    func testPlayAtTheEndStartsOver() {
+        XCTAssertEqual(Replay.startPosition(cursor: 100, duration: 100), 0)
+        XCTAssertEqual(Replay.startPosition(cursor: 99.97, duration: 100), 0)
+        XCTAssertEqual(Replay.startPosition(cursor: 42, duration: 100), 42)
+    }
+
+    func testRatesAndTheirLabels() {
+        XCTAssertEqual(Replay.rates, [1, 4, 10, 30])
+        XCTAssertTrue(Replay.rates.contains(Replay.defaultRate))
+        XCTAssertEqual(Replay.label(10), "10x")
+        XCTAssertEqual(Replay.label(0.5), "0.5x")
+    }
+}

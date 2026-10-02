@@ -137,3 +137,27 @@ enum TrackMath {
         return "\(count) stop\(count == 1 ? "" : "s") · \(Format.clock(seconds: standingSeconds)) standing"
     }
 }
+
+/// The replay clock: how far ride time moves for each tick of real time. Pure, so it is unit-tested (Tests/TrackMathTests.swift).
+enum Replay {
+    /// Ride seconds per real second: 1x is real time.
+    static let rates: [Double] = [1, 4, 10, 30]
+    static let defaultRate = 10.0
+    /// A tick that arrives late (the app was suspended for a moment) moves the replay by at most this much real time, not by the whole pause.
+    static let maxStep = 0.25
+
+    static func advance(cursor: Double, elapsed: Double, rate: Double, duration: Double) -> (cursor: Double, finished: Bool) {
+        guard elapsed > 0, rate > 0 else { return (cursor, false) }
+        let next = cursor + min(elapsed, maxStep) * rate
+        return next >= duration ? (duration, true) : (next, false)
+    }
+
+    /// Where a replay starts when Play is pressed: where it is, or the beginning if it already reached the end.
+    static func startPosition(cursor: Double, duration: Double) -> Double {
+        cursor >= duration - 0.05 ? 0 : cursor
+    }
+
+    static func label(_ rate: Double) -> String {
+        rate == rate.rounded() ? "\(Int(rate))x" : String(format: "%.1fx", rate)
+    }
+}
