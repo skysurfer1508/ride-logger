@@ -157,6 +157,7 @@ struct TrafficView: View {
     @State private var selectedWebcam: TrafficWebcam?
     @State private var selectedRoad: TwistyRoad?
     @State private var showPlanner = false
+    @State private var statusExpanded = false
     @State private var hint: String?
 
     init(api: APIClient, activeRoute: ActiveRouteModel) {
@@ -268,18 +269,20 @@ struct TrafficView: View {
     // MARK: controls
 
     private var layerChips: some View {
-        HStack(spacing: 8) {
-            chip("Traffic", systemImage: "car.fill", isOn: $showColours, available: true, layer: "colours")
-            chip("Incidents", systemImage: "exclamationmark.triangle.fill", isOn: $showIncidents, available: model.config?.incidents ?? false, layer: "incidents")
-            if showIncidents, model.config?.incidents == true {
-                chip("Works", systemImage: "hammer.fill", isOn: $showWorks, available: true, layer: "works")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip("Traffic", systemImage: "car.fill", isOn: $showColours, available: true, layer: "colours")
+                chip("Incidents", systemImage: "exclamationmark.triangle.fill", isOn: $showIncidents, available: model.config?.incidents ?? false, layer: "incidents")
+                if showIncidents, model.config?.incidents == true {
+                    chip("Works", systemImage: "hammer.fill", isOn: $showWorks, available: true, layer: "works")
+                }
+                chip("Webcams", systemImage: "video.fill", isOn: $showWebcams, available: model.config?.webcams ?? false, layer: "webcams")
+                chip("Roads", systemImage: "arrow.triangle.turn.up.right.diamond.fill", isOn: $showRoads, available: true, layer: "roads")
+                if showRoads {
+                    chip("New", systemImage: "sparkles", isOn: $onlyUnridden, available: true, layer: "unridden")
+                }
             }
-            chip("Webcams", systemImage: "video.fill", isOn: $showWebcams, available: model.config?.webcams ?? false, layer: "webcams")
-            chip("Roads", systemImage: "arrow.triangle.turn.up.right.diamond.fill", isOn: $showRoads, available: true, layer: "roads")
-            if showRoads {
-                chip("New", systemImage: "sparkles", isOn: $onlyUnridden, available: true, layer: "unridden")
-            }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 2)
         }
     }
 
@@ -289,6 +292,8 @@ struct TrafficView: View {
         } label: {
             Label(title, systemImage: available ? systemImage : "lock.fill")
                 .font(.footnote.weight(.semibold))
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, 10).padding(.vertical, 7)
                 .background((available && isOn.wrappedValue) ? Theme.accent : Theme.bg.opacity(0.85), in: Capsule())
                 .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
@@ -301,9 +306,14 @@ struct TrafficView: View {
     private var status: some View {
         let lines = statusLines
         if !lines.isEmpty {
+            let shown = statusExpanded ? lines : Array(lines.prefix(1))
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(lines, id: \.self) { line in
-                    Text(line).font(.caption).foregroundStyle(Theme.text)
+                ForEach(Array(shown.enumerated()), id: \.offset) { _, line in
+                    Text(line).font(.caption).foregroundStyle(Theme.text).lineLimit(statusExpanded ? nil : 2)
+                }
+                if lines.count > 1 || statusExpanded {
+                    Button(statusExpanded ? "Show less" : "\(lines.count - 1) more") { withAnimation { statusExpanded.toggle() } }
+                        .font(.caption2.weight(.semibold)).foregroundStyle(Theme.accent)
                 }
             }
             .padding(8)
