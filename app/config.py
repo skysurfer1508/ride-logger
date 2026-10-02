@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Apple's own live traffic colours on the map need no key at all (MapKit draws them on the phone).
     #   opentransportdata_api_key: official Swiss traffic situations (accidents, congestion, roadworks), from https://api-manager.opentransportdata.swiss
     #   windy_api_key: public webcams near a spot, from https://api.windy.com/keys
+    # Map matching and routing (deploy/valhalla). Empty switches the speed-limit check and the route planner off.
+    valhalla_url: str = "http://127.0.0.1:8002"
+    weather_enabled: bool = True          # Open-Meteo, no key. False sends no ride position anywhere
     opentransportdata_api_key: str = ""
     windy_api_key: str = ""
 

@@ -32,6 +32,7 @@ ENDPOINTS = {
     "api_settings": "/api/v1/settings",
     "api_garage": "/api/v1/garage",
     "api_garage_bike": "/api/v1/garage/bikes/{bike_id}",
+    "api_insights": "/api/v1/rides/{insights_ride_id}/insights",
     "api_traffic_config": "/api/v1/traffic/config",
     "api_traffic_incidents": "/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25",
     "api_traffic_webcams": "/api/v1/traffic/webcams?lat=47.3769&lon=8.5417&radius_km=15",
@@ -69,6 +70,18 @@ def fake_traffic(monkeypatch):
     monkeypatch.setattr(traffic, "_windy_get", lambda params: WINDY_JSON)
 
 
+@pytest.fixture(autouse=True)
+def fake_insights(monkeypatch):
+    """The insights endpoint gets a road and limit for every point and a dry grey day, instead of Valhalla and Open-Meteo."""
+    from app import valhalla, weather
+    from app.config import settings
+    from test_insights_api import hourly
+    monkeypatch.setattr(settings, "valhalla_url", "http://valhalla.invalid")
+    monkeypatch.setattr(settings, "weather_enabled", True)
+    monkeypatch.setattr(valhalla, "match_points", lambda pts: [{"limit_kmh": 80, "road_class": "primary", "name": "Hardstrasse", "way_id": 1, "use": "road"}] * len(pts))
+    monkeypatch.setattr(weather, "fetch", lambda lat, lon, start, end, now=None: hourly())
+
+
 @pytest.fixture
 def seeded(alice, monkeypatch):
     add_token(ALICE["sub"], ALICE["email"], "fixture-ingest-token-0000000000000000000")
@@ -99,7 +112,12 @@ def seeded(alice, monkeypatch):
 
 @pytest.mark.parametrize("name", sorted(ENDPOINTS))
 def test_fixture_matches_the_live_api(name, alice, seeded):
-    path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1)
+    insights_ride_id = None
+    if name == "api_insights":
+        # fast, a hard stop and a hard getaway: over the 80 limit, with a braking and an acceleration event. Added only here so the other fixtures keep their three rides.
+        insights_ride_id = add_ride(ALICE["sub"], datetime.now(timezone.utc).isoformat(), distance_m=5000, duration_s=300, points=150)
+        insert_points(ALICE["sub"], insights_ride_id, make_rows([("drive", 120, 25.0), ("drive", 60, 3.0), ("drive", 100, 22.0)]))
+    path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1, insights_ride_id=insights_ride_id)
     response = alice.get(path)
     assert response.status_code == 200
     actual = response.json()

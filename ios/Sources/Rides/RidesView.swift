@@ -233,7 +233,7 @@ struct RideDetailView: View {
     var body: some View {
         LoaderScreen(api: api, path: "rides/\(ride.id)/track") { (track: TrackResponse) in
             // .id: after a pull-to-refresh with a different answer the screen rebuilds its model instead of showing the old track
-            RideTrackContent(track: track).id("\(track.pointCount)-\(track.stops.count)-\(Int(track.distanceM))-\(track.featuresStatus ?? "")")
+            RideTrackContent(api: api, track: track).id("\(track.pointCount)-\(track.stops.count)-\(Int(track.distanceM))-\(track.featuresStatus ?? "")")
         }
         .navigationTitle(Format.shortDay(iso: ride.startTime))
         .navigationBarTitleDisplayMode(.inline)

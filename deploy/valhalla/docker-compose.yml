@@ -1,0 +1,32 @@
+# Valhalla: map matching (speed vs limit, road names) and motorcycle routing for RideLog. Switzerland only.
+# Listens on 127.0.0.1:8002 ONLY: the RideLog server talks to it, nothing outside this machine can. Never publish this port or put it on the tunnel.
+#
+#   cd deploy/valhalla && docker compose up -d        # first start downloads the map (~520 MB) and builds the routing tiles: allow 15-40 minutes
+#   docker compose logs -f                            # watch it; "Starting valhalla" / the port answering means it is ready
+#   curl http://127.0.0.1:8002/status                 # {"version": ...} when up
+#
+# The map data and tiles live in VALHALLA_DATA (outside the repository, not committed). refresh.sh rebuilds them with a newer map.
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: ridelog-valhalla
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8002"
+    volumes:
+      - ${VALHALLA_DATA:-/home/skysurfer1508/valhalla-data}:/custom_files
+    environment:
+      tile_urls: "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf"
+      use_tiles_ignore_pbf: "True"      # once tiles exist, start from them instead of reading the map again
+      force_rebuild: "${FORCE_REBUILD:-False}"
+      build_admins: "True"              # country/state information (Valhalla uses it for its default travel speeds; it does NOT invent speed limits: a road without a maxspeed tag has none)
+      build_time_zones: "False"
+      build_elevation: "False"
+      server_threads: "4"
+    mem_limit: 6g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:8002/status > /dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 3600s

@@ -10,7 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
-from .. import gpx, osm, track, traffic, views
+from .. import extras, gpx, osm, track, traffic, views
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..config import settings
 from ..db import get_db
@@ -130,6 +130,21 @@ def ride_track(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
     finally:
         conn.close()
     return reply({"ride": views.ride_summary(view), **result})
+
+
+@router.get("/rides/{ride_id}/insights")
+def ride_insights(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
+    """Elevation profile, smoothness, weather, and speed against the limit for one ride. Each part has its own status (ok | disabled | unavailable |
+    no_match | no_data) so one service being down never hides the rest. The slow remote answers are cached per ride."""
+    conn = get_db()
+    try:
+        rows = views.get_ride_points(conn, owner_sub, ride_id)
+        if rows is None:
+            raise HTTPException(status_code=404, detail="ride_not_found")
+        result = extras.build(conn, ride_id, rows)
+    finally:
+        conn.close()
+    return reply({"ride_id": ride_id, **result})
 
 
 @router.get("/rides/{ride_id}/gpx")

@@ -123,14 +123,33 @@ final class TrackModel: ObservableObject {
 }
 
 struct RideTrackContent: View {
+    let api: APIClient
     @StateObject private var model: TrackModel
     @State private var camera: MapCameraPosition
     @State private var selectedMinutes: Double?
+    @State private var insightsPhase: InsightsPhase = .loading
+    @AppStorage(InsightsLogic.showLimitsKey) private var showLimits = true
+
+    /// Weather, limits, elevation and smoothness arrive after the track (the server asks other services), so they never delay the map.
+    enum InsightsPhase {
+        case loading
+        case loaded(RideInsights)
+        case failed(String)
+    }
 
     private var track: TrackResponse { model.track }
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
-    init(track: TrackResponse) {
+    private var insights: RideInsights? {
+        if case .loaded(let value) = insightsPhase { return value }
+        return nil
+    }
+
+    private var roadNames: [RoadName] { insights?.roadNames ?? [] }
+    private var overStretches: [LimitStretch] { showLimits && insights?.limits.isOk == true ? insights?.limits.stretches ?? [] : [] }
+
+    init(api: APIClient, track: TrackResponse) {
+        self.api = api
         let model = TrackModel(track: track)
         _model = StateObject(wrappedValue: model)
         let fit = MapFit.rect(for: [model.coords])
@@ -138,7 +157,9 @@ struct RideTrackContent: View {
     }
 
     var body: some View {
-        content.onDisappear { model.pause() }
+        content
+            .onDisappear { model.pause() }
+            .task(id: track.ride.id) { await loadInsights() }
     }
 
     private var content: some View {
@@ -150,6 +171,7 @@ struct RideTrackContent: View {
                 mapPanel
                 cursorPanel
                 chartPanel
+                insightsPanels
                 stopsPanel
             }
         }
@@ -184,6 +206,12 @@ struct RideTrackContent: View {
         VStack(spacing: 8) {
             MapReader { proxy in
                 Map(position: $camera) {
+                    ForEach(overStretches) { stretch in
+                        MapPolyline(coordinates: InsightsLogic.points(from: stretch.tStart, to: stretch.tEnd, in: track.points).map {
+                            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
+                        })
+                        .stroke(LimitColors.over.opacity(0.6), style: StrokeStyle(lineWidth: 14, lineCap: .round, lineJoin: .round))
+                    }
                     ForEach(model.routes) { route in
                         MapPolyline(coordinates: route.coordinates)
                             .stroke(SpeedColors.color(route.bucket).opacity(model.replayActive ? 0.25 : 1), lineWidth: 5)
@@ -196,6 +224,14 @@ struct RideTrackContent: View {
                     ForEach(track.stops) { stop in
                         Annotation("", coordinate: CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lon), anchor: .center) {
                             StopBadge(stop: stop).onTapGesture { jump(to: stop) }
+                        }
+                    }
+                    ForEach((insights?.smoothness?.events ?? []).filter { $0.isBraking }.prefix(40)) { event in
+                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: event.lat, longitude: event.lon), anchor: .center) {
+                            Image(systemName: "arrow.down.circle.fill").font(.system(size: 17)).foregroundStyle(Theme.danger)
+                                .background(Circle().fill(Color.white).padding(2))
+                                .onTapGesture { model.select(time: event.tStart) }
+                                .accessibilityLabel(InsightsLogic.eventText(event))
                         }
                     }
                     if let top = track.maxSpeed {
@@ -242,6 +278,23 @@ struct RideTrackContent: View {
                 Text("km/h").font(.caption2).foregroundStyle(Theme.muted)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if !overStretches.isEmpty || !(insights?.smoothness?.events.isEmpty ?? true) {
+                HStack(spacing: 12) {
+                    if !overStretches.isEmpty {
+                        HStack(spacing: 4) {
+                            Capsule().fill(LimitColors.over.opacity(0.6)).frame(width: 16, height: 8)
+                            Text("over the limit").font(.caption2).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    if !(insights?.smoothness?.events.isEmpty ?? true) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(Theme.danger)
+                            Text("hard braking").font(.caption2).foregroundStyle(Theme.muted)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Text(model.replayActive ? "Replay: the colour behind the bike is the part already ridden." : "Tap the route to see the speed at that spot.")
                 .font(.caption).foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -271,6 +324,13 @@ struct RideTrackContent: View {
                 if let stop = TrackMath.stop(at: s.t, in: track.stops) {
                     Label("Standing still here: \(stop.label)", systemImage: "pause.circle.fill")
                         .font(.footnote).foregroundStyle(Theme.accent)
+                }
+                if let road = InsightsLogic.roadName(at: s.t, in: roadNames) {
+                    Label(road, systemImage: "signpost.right.fill").font(.footnote).foregroundStyle(Theme.muted)
+                }
+                if let over = InsightsLogic.stretch(at: s.t, in: overStretches) {
+                    Label("Over the limit here: up to +\(over.maxOverKmh) km/h in a \(over.limitKmh) zone", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(LimitColors.over)
                 }
                 replayControls
                 Slider(value: $model.cursor, in: 0...max(1, model.duration)).tint(Theme.accent)
@@ -373,6 +433,42 @@ struct RideTrackContent: View {
         }
     }
 
+    // MARK: insights
+
+    @ViewBuilder private var insightsPanels: some View {
+        switch insightsPhase {
+        case .loading:
+            InsightsLoadingPanel()
+        case .failed(let message):
+            InsightsFailedPanel(message: message) { Task { await loadInsights() } }
+        case .loaded(let value):
+            WeatherPanel(weather: value.weather)
+            if showLimits { LimitsPanel(limits: value.limits) { stretch in jump(toTime: stretch.tStart) } }
+            if let elevation = value.elevation {
+                ElevationPanel(profile: elevation, cursorMetres: model.sample?.dist ?? 0) { metres in
+                    if let time = InsightsLogic.time(atDistance: metres, in: track.points) { model.select(time: time) }
+                }
+            }
+            if let smoothness = value.smoothness {
+                SmoothnessPanel(smoothness: smoothness) { event in jump(toTime: event.tStart) }
+            }
+        }
+    }
+
+    private func loadInsights() async {
+        insightsPhase = .loading
+        do {
+            let value: RideInsights = try await api.get("rides/\(track.ride.id)/insights")
+            insightsPhase = .loaded(value)
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch is CancellationError {
+            // the screen went away
+        } catch {
+            insightsPhase = .failed((error as? LocalizedError)?.errorDescription ?? "Something went wrong.")
+        }
+    }
+
     // MARK: stops
 
     private var stopsPanel: some View {
@@ -380,7 +476,7 @@ struct RideTrackContent: View {
             Text(TrackMath.stopsSummary(count: track.stops.count, standingSeconds: track.stoppedS))
                 .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text)
             ForEach(track.stops) { stop in
-                Button { jump(to: stop) } label: { StopRow(stop: stop, wallClock: model.wallClock(stop.tStart)) }
+                Button { jump(to: stop) } label: { StopRow(stop: stop, wallClock: model.wallClock(stop.tStart), road: InsightsLogic.roadName(at: stop.tStart, in: roadNames)) }
                     .buttonStyle(.plain)
                 Divider().overlay(Theme.border)
             }
@@ -413,6 +509,14 @@ struct RideTrackContent: View {
         }
     }
 
+    /// Moves the moment and the map to the place the rider was at `time`.
+    private func jump(toTime time: Double) {
+        model.select(time: time)
+        if let s = model.sample {
+            withAnimation { camera = .camera(MapCamera(centerCoordinate: CLLocationCoordinate2D(latitude: s.lat, longitude: s.lon), distance: 900)) }
+        }
+    }
+
     private func jumpToTop(_ top: TopSpeed) {
         model.select(time: top.t)
         withAnimation {
@@ -426,13 +530,14 @@ struct RideTrackContent: View {
 struct StopRow: View {
     let stop: RideStop
     let wallClock: String?
+    var road: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             StopIcon(kind: stop.stopKind).frame(width: 30, height: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(stop.label).font(.subheadline).foregroundStyle(Theme.text)
-                Text("at \(Format.km(fromMeters: stop.distFromStartM)) km" + (wallClock.map { " · \($0)" } ?? ""))
+                Text("at \(Format.km(fromMeters: stop.distFromStartM)) km" + (wallClock.map { " · \($0)" } ?? "") + (road.map { " · \($0)" } ?? ""))
                     .font(.caption).foregroundStyle(Theme.muted)
             }
             Spacer()

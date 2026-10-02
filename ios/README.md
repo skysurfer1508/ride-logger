@@ -164,6 +164,32 @@ the new one. *Set odometer* corrects the reading at any time.
   is only as current as your last visit.
 - It is all stored on your server (your account only) and included nowhere else. Deleting a bike deletes its service, fuel and cost records; your rides stay.
 
+## Ride insights: weather, speed against the limit, elevation, smoothness
+
+Open a ride and scroll under the speed chart (needs the server restarted on this version, and Valhalla running for the limits, see below). The panels load after the
+map, so a slow service never delays the ride; each one says in words when its part is not available.
+
+- **Weather:** temperature, rain, wind and gusts for the hours of the ride, from [Open-Meteo](https://open-meteo.com) (free, no key, CC BY 4.0, shown on the
+  panel). It is the weather for the area where the ride started, not measured on your bike. Only the start position, rounded to about 10 km, is sent. Switch off
+  with `WEATHER_ENABLED=false` in `.env`.
+- **Speed against the limit:** the server snaps your track to roads with its own **Valhalla** map-matching service (Switzerland, runs in Docker on the server,
+  reachable only from the server itself) and compares your GPS speed with the `maxspeed` written on each road in OpenStreetMap. The panel shows the time and
+  distance over, the worst moment, and each stretch (tap one to jump there); stretches are drawn with a **pink glow** on the map. Things to keep in mind:
+  - Only roads **with a limit on the map** count in the numbers. Where OpenStreetMap has none, the Swiss default for that road type is assumed and reported on its own
+    line, as a guess (in a town an 80 default can be wrong, so a real speeding stretch can be missed there, never invented).
+  - Map limits can be missing or out of date, GPS speed is good to a few km/h, and **no legal tolerance is applied**. It is raw difference for you, not a ticket.
+  - Settings > Ride insights hides it in the app. The server still works it out (it is also what gives stops their road names).
+- **Road names:** stops and the "At this point" card say which road you were on.
+- **Elevation:** altitude along the ride (smoothed), climbed and descended, highest point. Drag over the chart to move the dot on the map. The phone's GPS altitude is
+  a few metres off; the figures are chosen so flat roads read as flat.
+- **Smoothness:** hard braking and hard acceleration from the speed once a second, a 0 to 100 score, and markers on the map for hard braking. GPS at 1 Hz misses the
+  sharpest peaks, so it is for comparing your own rides, not a measurement of g.
+
+**Server setup for the limits (once):** `cd deploy/valhalla && docker compose up -d` (the first start downloads the map and builds tiles, 15 to 40 minutes), then
+`python -m app.cli check-valhalla` (checks Valhalla and Open-Meteo, shows the road under a test point and the weather). `deploy/valhalla/refresh.sh` (and the systemd
+timer next to it) rebuild with a newer map. If Valhalla is down, rides still open; the limits panel says so. Results are cached per ride in the database
+(`ride_extras`); a ride that gets more points is looked up again.
+
 ## GPX export and import
 
 - **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple
@@ -232,6 +258,13 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
    Tap a stop: the map jumps to it. Is a stop missing or invented, or a label wrong? Note where and tell Claude.
 5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
 6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
+
+**Ride insights**
+1. Open a ride: after a moment a weather panel appears (right day, right place? temperatures believable?). Airplane mode: the ride still opens, the panels explain why they are empty.
+2. Speed against the limit: are the stretches you remember going fast pink on the map, with the right limit in the list? Is a stretch listed where you were not over (or a 50 zone shown that was really 30)?
+   Tell Claude the road and what the sign said. Settings > Ride insights off: the pink and the panel go away.
+3. Tap a stretch, a braking row, and the elevation chart: the dot and the map move there. Do the stops now show the road ("at 3.2 km · 14:03 · Hardstrasse")?
+4. Is the climbed metres figure close to what you expect for the route (compare with Komoot or the like)? Does a flat ride read as flat?
 
 **Traffic tab**
 1. Open it: iOS asks to use your location; the map opens around you (or Zurich centre). Road colours show; pan and zoom, the chips and counts follow.

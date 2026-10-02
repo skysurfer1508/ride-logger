@@ -128,6 +128,30 @@ def check_traffic() -> None:
         print(line)
 
 
+def check_valhalla() -> None:
+    """Asks the map-matching service for its status and for the road under one point in Zurich, and Open-Meteo for today's weather there."""
+    from datetime import datetime, timedelta, timezone
+    from . import valhalla, weather
+    from .config import settings
+    print(f"Valhalla at {settings.valhalla_url or '(not set)'}:", end=" ")
+    if not valhalla.configured():
+        print("switched off (VALHALLA_URL is empty)")
+    else:
+        try:
+            print("answering, version", valhalla.status().get("version"))
+            match = valhalla.match_points([(47.3769, 8.5417), (47.3772, 8.5421), (47.3775, 8.5425)])
+            print("  road under the test points:", [(m or {}).get("name") for m in match])
+        except valhalla.ValhallaUnavailable as e:
+            print("NOT working:", e)
+    print("Open-Meteo:", end=" ")
+    now = datetime.now(timezone.utc)
+    try:
+        summary = weather.summarize(weather.fetch(47.3769, 8.5417, now - timedelta(hours=2), now), now - timedelta(hours=2), now)
+        print(summary)
+    except weather.WeatherUnavailable as e:
+        print("NOT working:", e)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ride Logger maintenance CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -135,6 +159,7 @@ def main() -> None:
     reprocess_p.add_argument("--since", help="ISO date; only reprocess points from this date on")
     sub.add_parser("sweep", help="Finalize stale open trips / gap-inferred rides")
     sub.add_parser("check-traffic", help="Call the Traffic tab's data sources once and show what came back")
+    sub.add_parser("check-valhalla", help="Check the map-matching service and the weather service once")
     claim_p = sub.add_parser("claim-legacy", help="Assign pre-multi-user data to an account")
     claim_p.add_argument("email", help="Email of the account to assign legacy data to")
     args = parser.parse_args()
@@ -145,6 +170,8 @@ def main() -> None:
         sweep()
     elif args.command == "check-traffic":
         check_traffic()
+    elif args.command == "check-valhalla":
+        check_valhalla()
     elif args.command == "claim-legacy":
         claim_legacy(args.email)
 

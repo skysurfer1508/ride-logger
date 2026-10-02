@@ -16,6 +16,8 @@ os.environ["OIDC_SERVER_METADATA_URL"] = "https://auth.example.invalid/.well-kno
 os.environ["OIDC_REDIRECT_URI"] = "https://ride.example.invalid/auth/callback"
 os.environ["OPENTRANSPORTDATA_API_KEY"] = ""      # the traffic tests set fake keys themselves
 os.environ["WINDY_API_KEY"] = ""
+os.environ["VALHALLA_URL"] = ""                # no map matching in tests; the limit tests fake the matcher
+os.environ["WEATHER_ENABLED"] = "false"       # nor weather; the weather tests fake the HTTP call
 os.environ["OSM_ENABLED"] = "false"          # tests never touch the network; the OSM tests switch it on and fake the HTTP call
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

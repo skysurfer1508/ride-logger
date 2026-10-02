@@ -8,6 +8,7 @@ struct SettingsView: View {
     @ObservedObject var uploader: RideUploader
     @ObservedObject var autoStart: AutoStartCoordinator
     @AppStorage("keepScreenOn") private var keepScreenOn = true
+    @AppStorage(InsightsLogic.showLimitsKey) private var showSpeedLimits = true
     @State private var localRides: [RideRecorder.LocalRide] = []
     @State private var deleteTarget: RideRecorder.LocalRide?
 
@@ -54,6 +55,7 @@ struct SettingsView: View {
                     }
                     accountPanel
                     recordingPanel
+                    insightsPanel
                     AutoStartPanel(coordinator: autoStart, recorder: recorder)
                     dataPanel
                     overlandPanel
@@ -120,6 +122,16 @@ struct SettingsView: View {
                     confirmSignOut = true
                 }
             }
+        }
+    }
+
+    private var insightsPanel: some View {
+        Panel(title: "Ride insights") {
+            Toggle("Show speed against the limit", isOn: $showSpeedLimits)
+                .tint(Theme.accent)
+                .foregroundStyle(Theme.text)
+            Text("On a ride's screen: the stretches ridden over the limit written on the map, in pink. It only changes what this app shows; the server still works it out. Turn it off if you would rather not see it.")
+                .font(.footnote).foregroundStyle(Theme.muted)
         }
     }
 

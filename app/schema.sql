@@ -148,3 +148,15 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_expenses_bike ON expenses(bike_id);
+
+-- Slow or remote answers about one ride (kind: match = road and limit per point from Valhalla, weather = Open-Meteo hours). `points` is the number of
+-- prepared points the answer was made for, so a ride that grew (late uploads) is looked up again; `version` lets a changed format invalidate old rows.
+CREATE TABLE IF NOT EXISTS ride_extras (
+  ride_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  points INTEGER NOT NULL,
+  payload TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  PRIMARY KEY (ride_id, kind)
+);
