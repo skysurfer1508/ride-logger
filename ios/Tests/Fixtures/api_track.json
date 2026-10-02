@@ -2,6 +2,7 @@
  "api": 1,
  "distance_m": 1260,
  "duration_s": 164.0,
+ "features_status": "disabled",
  "max_speed": {
   "lat": 47.381469,
   "lon": 8.5417,
@@ -543,6 +544,7 @@
   {
    "dist_from_start_m": 480,
    "duration_s": 22.0,
+   "heading_deg": 0,
    "kind": "unknown",
    "label": "Stop",
    "lat": 47.381217,
@@ -553,6 +555,7 @@
   {
    "dist_from_start_m": 900,
    "duration_s": 40.0,
+   "heading_deg": 0,
    "kind": "unknown",
    "label": "Stop",
    "lat": 47.384994,

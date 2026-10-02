@@ -328,7 +328,7 @@ struct StopIcon: View {
             .background(Color.black, in: RoundedRectangle(cornerRadius: 3))
         case .stopSign: Image(systemName: "octagon.fill").foregroundStyle(Theme.danger)
         case .railCrossing: Image(systemName: "tram.fill").foregroundStyle(Theme.text)
-        case .crossing: Image(systemName: "figure.walk").foregroundStyle(Theme.text)
+        case .crossing: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.accent)
         case .traffic: Image(systemName: "car.fill").foregroundStyle(Theme.accent)
         case .unknown: Image(systemName: "pause.fill").foregroundStyle(Theme.muted)
         }

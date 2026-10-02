@@ -14,6 +14,7 @@ os.environ["OIDC_CLIENT_ID"] = "test-client"
 os.environ["OIDC_CLIENT_SECRET"] = "test-secret"
 os.environ["OIDC_SERVER_METADATA_URL"] = "https://auth.example.invalid/.well-known/openid-configuration"
 os.environ["OIDC_REDIRECT_URI"] = "https://ride.example.invalid/auth/callback"
+os.environ["OSM_ENABLED"] = "false"          # tests never touch the network; the OSM tests switch it on and fake the HTTP call
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

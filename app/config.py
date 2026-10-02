@@ -18,5 +18,12 @@ class Settings(BaseSettings):
     min_distance_m: float = 200
     stale_trip_minutes: float = 60
 
+    # Matching a ride's stops to traffic lights / signs from OpenStreetMap (app/osm.py). The server asks the public Overpass API for coarse map
+    # tiles around the stops and caches them; the phone never talks to Overpass. Set OSM_ENABLED=false to turn the lookup off.
+    osm_enabled: bool = True
+    overpass_urls: str = "https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter"
+    # The public Overpass servers ask for an identifying User-Agent: put a contact in it, e.g. "ride-logger/1.0 (you@example.com)".
+    osm_user_agent: str = "ride-logger/1.0 (self-hosted)"
+
 
 settings = Settings()

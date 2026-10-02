@@ -23,6 +23,19 @@ START_END_ZONE_M = 25.0     # a wait before the bike has left this circle around
                             # getting going or parking, not a stop (the first fix often carries a stale speed, so "touches the first fix" misses it)
 MIN_STOP_S = 8.0            # shorter than this is slowing down, not a stop
 
+# --- what a stop was for ---------------------------------------------------------------------------------------------------------------
+CLASSIFY_RADIUS_M = 35.0    # a traffic light / sign this close to where the rider stood still is what they were waiting for
+AHEAD_PENALTY_M = 15.0      # a feature behind the bike counts as this much further away than it is (the stop line is BEFORE the signal)
+HEADING_LOOKBACK_M = 20.0   # the travel direction is measured from a fix at least this far before the stop
+LABELS = {
+    "traffic_light": "Traffic light",
+    "stop_sign": "Stop sign",
+    "rail_crossing": "Level crossing",
+    "give_way": "Give way",
+    "other": "Traffic / other",
+    "unknown": "Stop",
+}
+
 # --- payload size ---------------------------------------------------------------------------------------------------------------------
 MAX_TRACK_POINTS = 2500
 
@@ -63,6 +76,29 @@ def _fill_speeds(points: list[dict]) -> None:
         a, b = points[max(0, i - 1)], points[min(n - 1, i + 1)]
         dt = b["t"] - a["t"]
         p["mps"] = geo.haversine_m(a["lat"], a["lon"], b["lat"], b["lon"]) / dt if dt > 0 else 0.0
+
+
+def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Compass direction from point 1 to point 2, degrees 0..360."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dl = math.radians(lon2 - lon1)
+    y = math.sin(dl) * math.cos(p2)
+    x = math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dl)
+    return (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+
+
+def _angle_between(a: float, b: float) -> float:
+    d = abs(a - b) % 360.0
+    return 360.0 - d if d > 180.0 else d
+
+
+def _heading_into(points: list[dict], first: int) -> Optional[int]:
+    """The direction the bike was travelling when it arrived at the stop that starts at points[first], or None if it didn't travel far enough."""
+    for j in range(first - 1, -1, -1):
+        if points[first]["dist"] - points[j]["dist"] >= HEADING_LOOKBACK_M:
+            a, b = points[j], points[first]
+            return round(_bearing(a["lat"], a["lon"], b["lat"], b["lon"]))
+    return None
 
 
 def _interval_is_stationary(a: dict, b: dict) -> bool:
@@ -113,12 +149,32 @@ def detect_stops(points: list[dict]) -> list[dict]:
             "lat": round(lats[mid], 6),
             "lon": round(lons[mid], 6),
             "dist_from_start_m": round(points[first]["dist"]),
+            "heading_deg": _heading_into(points, first),
             "kind": "unknown",
-            "label": "Stop",
+            "label": LABELS["unknown"],
             "_first": first,
             "_last": last,
         })
     return stops
+
+
+def classify_stop(stop: dict, features: list[dict]) -> dict:
+    """Says what a stop was for, from the OpenStreetMap features (kind, lat, lon) near it. The nearest feature within CLASSIFY_RADIUS_M wins,
+    one ahead of the bike preferred over one behind it. Nothing close means the rider was held up by traffic, not by a light or a sign."""
+    heading = stop.get("heading_deg")
+    best = None
+    for f in features:
+        d = geo.haversine_m(stop["lat"], stop["lon"], f["lat"], f["lon"])
+        if d > CLASSIFY_RADIUS_M:
+            continue
+        ahead = heading is None or _angle_between(_bearing(stop["lat"], stop["lon"], f["lat"], f["lon"]), heading) < 90.0 or d < 5.0
+        score = d + (0.0 if ahead else AHEAD_PENALTY_M)
+        if best is None or score < best[0]:
+            best = (score, f["kind"])
+    kind = best[1] if best else "other"
+    stop["kind"] = kind
+    stop["label"] = LABELS.get(kind, LABELS["unknown"])
+    return stop
 
 
 def _downsample(points: list[dict], stops: list[dict], top: Optional[int]) -> list[dict]:

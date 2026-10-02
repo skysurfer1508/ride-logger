@@ -8,7 +8,7 @@ recorder use with a bearer token.
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from .. import track, views
+from .. import osm, track, views
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..config import settings
 from ..db import get_db
@@ -114,17 +114,20 @@ def ride_detail(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
 
 @router.get("/rides/{ride_id}/track")
 def ride_track(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
-    """The ride's GPS track with speed at every fix, its top speed and the stops in it, for the map, the scrubber and the replay."""
+    """The ride's GPS track with speed at every fix, its top speed and the stops in it (what each was for, from OpenStreetMap), for the map,
+    the scrubber and the replay. `features_status`: ok | unavailable (the OSM lookup failed, stops are plain "Stop") | disabled."""
     conn = get_db()
     try:
         found = views.get_ride(conn, owner_sub, ride_id)
         rows = views.get_ride_points(conn, owner_sub, ride_id)
+        if not found or rows is None:
+            raise HTTPException(status_code=404, detail="ride_not_found")
+        view, _ = found
+        result = track.build_track(rows)
+        result["features_status"] = osm.classify_stops(conn, result["stops"])
     finally:
         conn.close()
-    if not found or rows is None:
-        raise HTTPException(status_code=404, detail="ride_not_found")
-    view, _ = found
-    return reply({"ride": views.ride_summary(view), **track.build_track(rows)})
+    return reply({"ride": views.ride_summary(view), **result})
 
 
 @router.delete("/rides/{ride_id}", dependencies=[Depends(require_api_client)])

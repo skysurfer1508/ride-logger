@@ -64,3 +64,21 @@ CREATE TABLE IF NOT EXISTS ingest_tokens (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ingest_tokens_owner ON ingest_tokens(owner_sub);
+
+-- OpenStreetMap features (traffic signals, stop / give-way signs, level crossings) near the places a rider stood still, cached per 0.05 degree
+-- tile (about 4 x 5.5 km) so the public Overpass API is asked once per tile and not once per ride. See app/osm.py.
+CREATE TABLE IF NOT EXISTS osm_tiles (
+  tile_id TEXT PRIMARY KEY,
+  fetched_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS osm_features (
+  osm_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,                      -- traffic_light | stop_sign | give_way | rail_crossing
+  lat REAL NOT NULL,
+  lon REAL NOT NULL,
+  direction TEXT,
+  tile_id TEXT NOT NULL,
+  PRIMARY KEY (osm_id, kind)
+);
+CREATE INDEX IF NOT EXISTS idx_osm_features_tile ON osm_features(tile_id);
+CREATE INDEX IF NOT EXISTS idx_osm_features_pos ON osm_features(lat, lon);
