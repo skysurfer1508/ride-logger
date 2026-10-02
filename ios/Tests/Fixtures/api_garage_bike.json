@@ -1,0 +1,89 @@
+{
+ "api": 1,
+ "bike": {
+  "id": 1,
+  "is_default": true,
+  "make": "Aprilia",
+  "model": "1100 RR",
+  "name": "Tuono",
+  "odometer_km": 10360.7,
+  "ridden_km": 360.7,
+  "start_date": "2026-01-01",
+  "start_odometer_km": 10000.0,
+  "year": 2021
+ },
+ "expenses": [
+  {
+   "amount": 180.0,
+   "category": "Tyres",
+   "date": "2026-09-15",
+   "id": 1,
+   "note": "Rear"
+  }
+ ],
+ "fuel": {
+  "average_l_per_100km": 4.4,
+  "average_price_per_litre": 2.048,
+  "fills": [
+   {
+    "date": "2026-09-10",
+    "full_tank": true,
+    "id": 2,
+    "km_since": 250.0,
+    "l_per_100km": 4.4,
+    "litres": 11.0,
+    "odometer_km": 10250.0,
+    "price": 23.1
+   },
+   {
+    "date": "2026-09-01",
+    "full_tank": true,
+    "id": 1,
+    "km_since": null,
+    "l_per_100km": null,
+    "litres": 12.0,
+    "odometer_km": 10000.0,
+    "price": 24.0
+   }
+  ],
+  "measured_km": 250.0,
+  "total_litres": 23.0,
+  "total_spent": 47.1
+ },
+ "items": [
+  {
+   "id": 1,
+   "interval_km": 6000.0,
+   "interval_months": 12,
+   "last_done_date": "2026-06-01",
+   "last_done_km": 9500.0,
+   "name": "Oil change",
+   "status": {
+    "due_date": "2027-06-01",
+    "due_km": 15500.0,
+    "limited_by": "date",
+    "remaining_days": 242,
+    "remaining_km": 5139.3,
+    "state": "ok"
+   }
+  }
+ ],
+ "service_log": [
+  {
+   "cost": 180.5,
+   "done_date": "2026-06-01",
+   "id": 1,
+   "item_id": 1,
+   "item_name": "Oil change",
+   "note": "Dealer",
+   "odometer_km": 9500.0
+  }
+ ],
+ "totals": {
+  "all": 407.6,
+  "fuel": 47.1,
+  "other": 180.0,
+  "per_km": 1.13,
+  "service": 180.5
+ }
+}

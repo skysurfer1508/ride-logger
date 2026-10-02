@@ -27,6 +27,9 @@ def _migrate_owner_columns(conn: sqlite3.Connection) -> None:
     for table in ("points", "rides"):
         if not _column_exists(conn, table, "owner_sub"):
             conn.execute(f"ALTER TABLE {table} ADD COLUMN owner_sub TEXT NOT NULL DEFAULT ''")
+    # which bike a ride was on (NULL = the owner's default bike, see schema.sql "Garage")
+    if not _column_exists(conn, "rides", "bike_id"):
+        conn.execute("ALTER TABLE rides ADD COLUMN bike_id INTEGER")
 
 
 _MIGRATION_MARKER = "-- ##POST_MIGRATION##"

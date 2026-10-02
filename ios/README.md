@@ -147,6 +147,23 @@ A ride that started by itself ends by itself after 10 minutes without moving; yo
 2. Ride a few minutes, stop, park for 10+ minutes: did the ride end by itself?
 3. Optionally turn the helmet off and ride to test the motion fallback (needs Always).
 
+## Garage: odometer, service, fuel, costs
+
+Home > *Garage*. Add your bike with the odometer reading it has today; from then on **every ride you record adds to it by itself** (rides count for your
+default bike; on the ride screen, with more than one bike, the wrench menu puts a ride on another one). Changing the default bike does not move your history to
+the new one. *Set odometer* corrects the reading at any time.
+
+- **Service:** add what you want to track (oil, chain, tyres, brake fluid, the yearly inspection) with a distance, a time or both ("every 6000 km or 12
+  months"): it is due at **whichever comes first**. "Due soon" starts 30 days ahead, or 500 km (or a tenth of the interval, if smaller) ahead. Say when it was
+  last done, or start counting from today, then press *Done* each time you do it (date, odometer, cost, note).
+- **Fuel:** enter each fill-up (odometer, litres, price, whether you filled to the top). Consumption is worked out the standard way, **between two full tanks**
+  (part fills in between add their litres but do not end the interval); the first full tank is only the starting point. You need two to see a number.
+- **Costs:** fuel, services and other expenses (tyres, insurance, ...) add up, with a cost per kilometre ridden in RideLog.
+- **Reminders:** when you open the app and something is overdue or due soon, one notification is scheduled for the next evening at 17:00 (not more than every
+  3 days, only with notification permission, nothing while nothing is due). The phone cannot count kilometres while the app is closed, so the reminder
+  is only as current as your last visit.
+- It is all stored on your server (your account only) and included nowhere else. Deleting a bike deletes its service, fuel and cost records; your rides stay.
+
 ## GPX export and import
 
 - **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple

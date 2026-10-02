@@ -10,12 +10,13 @@ which the shape check ignores).
 """
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from conftest import ALICE, add_ride, add_token
+from app.db import get_db
 from test_track import insert_points
 from trackgen import make_rows
 
@@ -29,6 +30,8 @@ ENDPOINTS = {
     "api_overview": "/api/v1/overview",
     "api_map": "/api/v1/map",
     "api_settings": "/api/v1/settings",
+    "api_garage": "/api/v1/garage",
+    "api_garage_bike": "/api/v1/garage/bikes/{bike_id}",
     "api_traffic_config": "/api/v1/traffic/config",
     "api_traffic_incidents": "/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25",
     "api_traffic_webcams": "/api/v1/traffic/webcams?lat=47.3769&lon=8.5417&radius_km=15",
@@ -67,7 +70,7 @@ def fake_traffic(monkeypatch):
 
 
 @pytest.fixture
-def seeded(alice):
+def seeded(alice, monkeypatch):
     add_token(ALICE["sub"], ALICE["email"], "fixture-ingest-token-0000000000000000000")
     today = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
     ids = []
@@ -77,12 +80,26 @@ def seeded(alice):
                             polyline=[[47.3769, 8.5417], [47.3801, 8.5502], [47.3866, 8.5611], [47.3902, 8.5739]]))
     # ride ids[1] gets a real track (a light with fixes, a wait with none) so api_track.json has stops in it
     insert_points(ALICE["sub"], ids[1], make_rows([("drive", 40, 12), ("stop", 25, "zero"), ("drive", 30, 14), ("stop", 40, "gap"), ("drive", 30, 12)]))
+    # a bike with a service item, two fuel fills and an expense, for api_garage*.json (the database is fresh for every test, so this bike has id 1)
+    from app import garage_store as g
+    from app.routers import api_garage
+    monkeypatch.setattr(api_garage, "_today", lambda: date(2026, 10, 2))
+    conn = get_db()
+    try:
+        bike = g.create_bike(conn, ALICE["sub"], name="Tuono", make="Aprilia", model="1100 RR", year=2021, start_odometer_km=10000.0, start_date=date(2026, 1, 1))
+        item = g.add_item(conn, ALICE["sub"], bike, name="Oil change", interval_km=6000.0, interval_months=12)
+        g.log_service(conn, ALICE["sub"], item, done_date=date(2026, 6, 1), odometer=9500.0, cost=180.5, note="Dealer")
+        g.add_fuel(conn, ALICE["sub"], bike, day=date(2026, 9, 1), odometer=10000.0, litres=12.0, price=24.0, full_tank=True)
+        g.add_fuel(conn, ALICE["sub"], bike, day=date(2026, 9, 10), odometer=10250.0, litres=11.0, price=23.1, full_tank=True)
+        g.add_expense(conn, ALICE["sub"], bike, day=date(2026, 9, 15), category="Tyres", amount=180.0, note="Rear")
+    finally:
+        conn.close()
     return ids
 
 
 @pytest.mark.parametrize("name", sorted(ENDPOINTS))
 def test_fixture_matches_the_live_api(name, alice, seeded):
-    path = ENDPOINTS[name].format(ride_id=seeded[1])
+    path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1)
     response = alice.get(path)
     assert response.status_code == 200
     actual = response.json()

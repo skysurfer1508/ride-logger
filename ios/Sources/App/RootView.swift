@@ -76,6 +76,7 @@ struct MainTabs: View {
                     await recorder.uploader.refreshCredentials()
                     await recorder.uploader.syncAll()
                 }
+                Task { await GarageReminders.refresh(api: api) }
             }
         }
     }

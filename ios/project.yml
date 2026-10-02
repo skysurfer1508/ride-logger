@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.7"
-    CURRENT_PROJECT_VERSION: "8"
+    MARKETING_VERSION: "1.8"
+    CURRENT_PROJECT_VERSION: "9"
 targets:
   RideLog:
     type: application
@@ -92,6 +92,7 @@ targets:
       - Sources/Core/TrackMath.swift
       - Sources/API/TrafficModels.swift
       - Sources/API/ImportModels.swift
+      - Sources/API/GarageModels.swift
       - Sources/AutoStart/AutoStartLogic.swift
       - Sources/AutoStart/AutoStartLog.swift
       - Sources/Core/TrafficLogic.swift

@@ -41,6 +41,19 @@ private struct HomeContent: View {
             }
             .buttonStyle(.plain)
 
+            NavigationLink {
+                GarageView(api: api)
+            } label: {
+                Panel {
+                    HStack {
+                        Label("Garage: odometer, service, fuel and costs", systemImage: "wrench.and.screwdriver.fill").foregroundStyle(Theme.text)
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
             if let latest = home.latest {
                 Text("LATEST RIDE").font(Theme.label).tracking(1.4).foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)

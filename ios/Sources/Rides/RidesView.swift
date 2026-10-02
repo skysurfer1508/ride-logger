@@ -228,6 +228,7 @@ struct RideDetailView: View {
     @State private var errorText: String?
     @State private var shareItem: ShareItem?
     @State private var exporting = false
+    @State private var bikes: [BikeSummary] = []
 
     var body: some View {
         LoaderScreen(api: api, path: "rides/\(ride.id)/track") { (track: TrackResponse) in
@@ -238,6 +239,13 @@ struct RideDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if bikes.count > 1 {
+                    Menu {
+                        Button("Default bike") { Task { await putOnBike(nil) } }
+                        ForEach(bikes) { bike in Button(bike.name) { Task { await putOnBike(bike.id) } } }
+                    } label: { Image(systemName: "wrench.and.screwdriver") }
+                        .accessibilityLabel("Which bike was this ride on")
+                }
                 Button { Task { await exportGPX() } } label: { Image(systemName: "square.and.arrow.up") }
                     .disabled(exporting)
                     .accessibilityLabel("Export this ride as a GPX file")
@@ -247,6 +255,9 @@ struct RideDetailView: View {
             }
         }
         .sheet(item: $shareItem) { item in ShareSheet(items: [item.url]) }
+        .task {
+            if let overview: GarageOverview = try? await api.get("garage") { bikes = overview.bikes }
+        }
         .confirmationDialog("Delete this ride?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete ride", role: .destructive) { Task { await delete() } }
         } message: {
@@ -256,6 +267,18 @@ struct RideDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorText ?? "")
+        }
+    }
+
+    /// Which bike this ride counts for (nil = back to "the default bike").
+    private func putOnBike(_ bikeId: Int?) async {
+        do {
+            let _: BikeAssignment = try await api.post("rides/\(ride.id)/bike", form: ["bike_id": bikeId.map { String($0) } ?? ""])
+            NotificationCenter.default.post(name: .ridesChanged, object: nil)
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
         }
     }
 

@@ -82,3 +82,69 @@ CREATE TABLE IF NOT EXISTS osm_features (
 );
 CREATE INDEX IF NOT EXISTS idx_osm_features_tile ON osm_features(tile_id);
 CREATE INDEX IF NOT EXISTS idx_osm_features_pos ON osm_features(lat, lon);
+
+-- Garage (see app/garage.py and app/garage_store.py). A ride counts towards a bike's odometer when rides.bike_id is that bike, or when it is NULL and
+-- the bike is the owner's default, and in both cases only from the bike's start_date on (rides before the bike was added are not on its odometer).
+CREATE TABLE IF NOT EXISTS bikes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  make TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT '',
+  year INTEGER,
+  start_odometer_km REAL NOT NULL DEFAULT 0,      -- what the odometer read on start_date
+  start_date TEXT NOT NULL,                        -- YYYY-MM-DD
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bikes_owner ON bikes(owner_sub);
+
+CREATE TABLE IF NOT EXISTS service_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bike_id INTEGER NOT NULL,
+  owner_sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  interval_km REAL,
+  interval_months INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_service_items_bike ON service_items(bike_id);
+
+CREATE TABLE IF NOT EXISTS service_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL,
+  bike_id INTEGER NOT NULL,
+  owner_sub TEXT NOT NULL,
+  done_date TEXT NOT NULL,
+  odometer_km REAL,
+  cost REAL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_service_log_item ON service_log(item_id);
+CREATE INDEX IF NOT EXISTS idx_service_log_bike ON service_log(bike_id);
+
+CREATE TABLE IF NOT EXISTS fuel_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bike_id INTEGER NOT NULL,
+  owner_sub TEXT NOT NULL,
+  date TEXT NOT NULL,
+  odometer_km REAL NOT NULL,
+  litres REAL NOT NULL,
+  price REAL,                                      -- the total paid
+  full_tank INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_fuel_log_bike ON fuel_log(bike_id);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  bike_id INTEGER NOT NULL,
+  owner_sub TEXT NOT NULL,
+  date TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  amount REAL NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_expenses_bike ON expenses(bike_id);

@@ -1,0 +1,17 @@
+{
+ "api": 1,
+ "bikes": [
+  {
+   "id": 1,
+   "is_default": true,
+   "make": "Aprilia",
+   "model": "1100 RR",
+   "name": "Tuono",
+   "next_due": null,
+   "odometer_km": 10360.7,
+   "overdue": 0,
+   "soon": 0,
+   "year": 2021
+  }
+ ]
+}
