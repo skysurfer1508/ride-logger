@@ -16,6 +16,37 @@ struct LocationSample: Codable, Equatable {
     var verticalAccuracy: Double
     /// 0...1, or negative when unknown.
     var batteryLevel: Double
+    /// How far off `speed` may be, in m/s (CoreLocation's speedAccuracy). Negative when unknown, which is also what rides saved by an older
+    /// version of the app have.
+    var speedAccuracy: Double = -1
+
+    init(timestamp: Date, latitude: Double, longitude: Double, speed: Double, altitude: Double, horizontalAccuracy: Double,
+         verticalAccuracy: Double, batteryLevel: Double, speedAccuracy: Double = -1) {
+        self.timestamp = timestamp
+        self.latitude = latitude
+        self.longitude = longitude
+        self.speed = speed
+        self.altitude = altitude
+        self.horizontalAccuracy = horizontalAccuracy
+        self.verticalAccuracy = verticalAccuracy
+        self.batteryLevel = batteryLevel
+        self.speedAccuracy = speedAccuracy
+    }
+
+    // Written by hand: the synthesized decoder demands every key, and a ride recorded before `speedAccuracy` existed (and still waiting on the
+    // phone to upload) has none. Without this its fixes would all be skipped as unreadable.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        latitude = try c.decode(Double.self, forKey: .latitude)
+        longitude = try c.decode(Double.self, forKey: .longitude)
+        speed = try c.decode(Double.self, forKey: .speed)
+        altitude = try c.decode(Double.self, forKey: .altitude)
+        horizontalAccuracy = try c.decode(Double.self, forKey: .horizontalAccuracy)
+        verticalAccuracy = try c.decode(Double.self, forKey: .verticalAccuracy)
+        batteryLevel = try c.decode(Double.self, forKey: .batteryLevel)
+        speedAccuracy = try c.decodeIfPresent(Double.self, forKey: .speedAccuracy) ?? -1
+    }
 }
 
 /// A ride on this phone: what identifies it, whose it is, and how much of it the server has.
@@ -120,6 +151,33 @@ struct LiveStats: Equatable {
 }
 
 enum RecordingLogic {
+    /// iPhones in the open report a speed accurate to well under 1 m/s. A reading worse than this is not used as it is.
+    static let maxTrustedSpeedAccuracyMps = 1.5
+    /// Positions this good are worth working a speed out of when the reported one is not usable.
+    static let goodPositionAccuracyM = 10.0
+    /// Fixes further apart in time than this are not used to work out a speed.
+    static let maxDerivedGapS = 5.0
+
+    /// The speed to keep for a fix, in m/s. The phone's own speed comes from the GPS signal's Doppler shift (not from the accelerometer, and not from
+    /// positions), and is the most precise thing there is, so it is used whenever it is valid and its stated accuracy is good. When it is missing
+    /// (negative) or poor, in order: the speed between this fix and the previous one if both positions are accurate, else the previous speed carried
+    /// on for a moment, else whatever was reported (0 if unknown). Never invents a speed from poor positions: that is worse than the poor reading.
+    static func trustedSpeed(reported: Double, speedAccuracy: Double, horizontalAccuracy: Double, latitude: Double, longitude: Double,
+                             at time: Date, previous: LocationSample?) -> Double {
+        if reported >= 0 && (speedAccuracy < 0 || speedAccuracy <= maxTrustedSpeedAccuracyMps) { return reported }
+        if let previous {
+            let dt = time.timeIntervalSince(previous.timestamp)
+            if dt > 0 && dt <= maxDerivedGapS {
+                if horizontalAccuracy >= 0 && horizontalAccuracy <= goodPositionAccuracyM
+                    && previous.horizontalAccuracy >= 0 && previous.horizontalAccuracy <= goodPositionAccuracyM {
+                    return Geo.haversineM(lat1: previous.latitude, lon1: previous.longitude, lat2: latitude, lon2: longitude) / dt
+                }
+                return max(previous.speed, 0)
+            }
+        }
+        return max(reported, 0)
+    }
+
     /// The speed to show: a fix older than this means the bike has stopped (with a distance filter CoreLocation sends nothing while standing
     /// still, so the last reading would otherwise stay on screen at a red light).
     static let speedFreshSeconds = 4.0

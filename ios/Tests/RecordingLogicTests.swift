@@ -1,9 +1,9 @@
 import XCTest
 
 func makeSample(_ seconds: Double, lat: Double = 47.0, lon: Double = 8.0, speed: Double = 10, accuracy: Double = 5,
-                altitude: Double = 400, verticalAccuracy: Double = 8, battery: Double = 0.8) -> LocationSample {
+                altitude: Double = 400, verticalAccuracy: Double = 8, battery: Double = 0.8, speedAccuracy: Double = -1) -> LocationSample {
     LocationSample(timestamp: Date(timeIntervalSince1970: 1_790_586_900 + seconds), latitude: lat, longitude: lon, speed: speed,
-                   altitude: altitude, horizontalAccuracy: accuracy, verticalAccuracy: verticalAccuracy, batteryLevel: battery)
+                   altitude: altitude, horizontalAccuracy: accuracy, verticalAccuracy: verticalAccuracy, batteryLevel: battery, speedAccuracy: speedAccuracy)
 }
 
 final class LiveStatsTests: XCTestCase {
@@ -144,5 +144,65 @@ final class LiveSnapshotTests: XCTestCase {
     func testTheSnapshotSurvivesTheRoundTripTheSystemDoesBetweenAppAndWidget() throws {
         let snap = LiveSnapshot(speedKmh: 87, distanceM: 4321.5, maxKmh: 112, gpsOK: true)
         XCTAssertEqual(try JSONDecoder().decode(LiveSnapshot.self, from: JSONEncoder().encode(snap)), snap)
+    }
+}
+
+final class TrustedSpeedTests: XCTestCase {
+    private func trusted(reported: Double, speedAccuracy: Double, horizontalAccuracy: Double = 5, lat: Double = 47.00009, at seconds: Double = 1,
+                         previous: LocationSample?) -> Double {
+        RecordingLogic.trustedSpeed(reported: reported, speedAccuracy: speedAccuracy, horizontalAccuracy: horizontalAccuracy, latitude: lat, longitude: 8.0,
+                                    at: makeSample(seconds).timestamp, previous: previous)
+    }
+
+    func testAGoodReadingFromThePhoneIsUsedAsItIs() {
+        XCTAssertEqual(trusted(reported: 12.34, speedAccuracy: 0.4, previous: makeSample(0, speed: 11)), 12.34)
+        XCTAssertEqual(trusted(reported: 12.34, speedAccuracy: 1.5, previous: makeSample(0, speed: 11)), 12.34)        // right at the limit
+        XCTAssertEqual(trusted(reported: 0, speedAccuracy: 0.2, previous: makeSample(0, speed: 11)), 0)               // a true standstill is a real reading
+    }
+
+    func testAnUnknownAccuracyIsTrustedLikeRidesFromBeforeTheFieldExisted() {
+        XCTAssertEqual(trusted(reported: 12.34, speedAccuracy: -1, previous: nil), 12.34)
+    }
+
+    func testAPoorReadingBecomesTheSpeedBetweenTwoGoodPositions() {
+        // 0.00009 degrees of latitude is 10.0 m, in one second
+        let v = trusted(reported: 25, speedAccuracy: 3.0, previous: makeSample(0, lat: 47.0, speed: 11, accuracy: 5))
+        XCTAssertEqual(v, 10.0, accuracy: 0.05)
+    }
+
+    func testPoorPositionsAreNotUsedToWorkOutASpeedTheLastSpeedIsKeptInstead() {
+        XCTAssertEqual(trusted(reported: 25, speedAccuracy: 3.0, horizontalAccuracy: 25, previous: makeSample(0, lat: 47.0, speed: 11, accuracy: 5)), 11)
+        XCTAssertEqual(trusted(reported: 25, speedAccuracy: 3.0, previous: makeSample(0, lat: 47.0, speed: 11, accuracy: 25)), 11)
+    }
+
+    func testAnUnknownSpeedWithNothingToGoOnIsZeroNeverNegative() {
+        XCTAssertEqual(trusted(reported: -1, speedAccuracy: -1, previous: nil), 0)
+        XCTAssertEqual(trusted(reported: -1, speedAccuracy: -1, at: 20, previous: makeSample(0, speed: 11)), 0)         // the previous fix is too old to say anything
+    }
+
+    func testAnUnknownSpeedIsWorkedOutFromAccuratePositions() {
+        XCTAssertEqual(trusted(reported: -1, speedAccuracy: -1, previous: makeSample(0, lat: 47.0, speed: 11, accuracy: 4)), 10.0, accuracy: 0.05)
+    }
+
+    func testAGapTooLongToMeasureASpeedFallsBackToTheReportedOne() {
+        XCTAssertEqual(trusted(reported: 7, speedAccuracy: 3.0, at: 10, previous: makeSample(0, speed: 11)), 7)
+    }
+
+    func testSamplesSavedBeforeTheSpeedAccuracyExistedStillLoad() throws {
+        let json = #"{"timestamp":"2026-09-28T09:15:00Z","latitude":47.0,"longitude":8.0,"speed":12.5,"altitude":400,"horizontalAccuracy":5,"verticalAccuracy":8,"batteryLevel":0.8}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sample = try decoder.decode(LocationSample.self, from: Data(json.utf8))
+        XCTAssertEqual(sample.speed, 12.5)
+        XCTAssertEqual(sample.speedAccuracy, -1)
+    }
+
+    func testTheSpeedAccuracyIsKeptWhenASampleIsSavedAndRead() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sample = makeSample(5, speed: 8.2, speedAccuracy: 0.35)
+        XCTAssertEqual(try decoder.decode(LocationSample.self, from: encoder.encode(sample)), sample)
     }
 }

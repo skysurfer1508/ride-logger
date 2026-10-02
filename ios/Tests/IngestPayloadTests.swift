@@ -17,7 +17,8 @@ final class IngestPayloadTests: XCTestCase {
                 speed: try XCTUnwrap(s["speed"] as? Double), altitude: try XCTUnwrap(s["altitude"] as? Double),
                 horizontalAccuracy: try XCTUnwrap(s["horizontal_accuracy"] as? Double),
                 verticalAccuracy: try XCTUnwrap(s["vertical_accuracy"] as? Double),
-                batteryLevel: try XCTUnwrap(s["battery_level"] as? Double))
+                batteryLevel: try XCTUnwrap(s["battery_level"] as? Double),
+                speedAccuracy: try XCTUnwrap(s["speed_accuracy"] as? Double))
         }
     }
 
@@ -68,6 +69,13 @@ final class IngestPayloadTests: XCTestCase {
         XCTAssertNil(p["altitude"])
         XCTAssertNil(p["battery_level"])
         XCTAssertNotNil(p["speed"])
+    }
+
+    func testTheSpeedAccuracyIsUploadedOnlyWhenKnown() throws {
+        let known = IngestPayload.feature(for: makeSample(0, speedAccuracy: 0.4), deviceId: "d", tripId: "t")
+        XCTAssertEqual((known["properties"] as? [String: Any])?["speed_accuracy"] as? Double, 0.4)
+        let unknown = IngestPayload.feature(for: makeSample(0), deviceId: "d", tripId: "t")
+        XCTAssertNil((unknown["properties"] as? [String: Any])?["speed_accuracy"])
     }
 
     func testAFixWithNonFiniteNumbersNeverReachesTheBody() throws {

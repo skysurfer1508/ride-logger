@@ -41,6 +41,18 @@ Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` in `project.yml` for each r
 
 Your rides stay on the phone until they have uploaded; the newest five uploaded ones are kept as a backup (Settings > Recording lists them).
 
+## Where the speed comes from
+
+The speed is **the one iOS reports with each GPS fix**, which it derives from the Doppler shift of the satellite signals. It is not calculated from positions and
+not from the accelerometer, and on a clear sky it is accurate to well under 1 km/h. On a real ride (12 min, 4.2 km) it agreed with the speed worked out from the
+positions to within 1.8 km/h on average. The app uses it as it is when iOS also states it is accurate (`speedAccuracy` up to 1.5 m/s). When a reading is
+missing or poor, it uses the speed between two accurate positions, otherwise keeps the last speed for a moment; it never invents a speed from poor positions.
+The accuracy is saved with every fix.
+
+What can still make the number look different from what you expect: **a motorbike's own speedometer reads high** (by rule it may not read low, and many read
+5-10 % high), so 100 on the bike is often 92-95 true; the fix arrives once a second, so the number changes in one-second steps; and the Lock Screen / Dynamic
+Island display is refreshed every few seconds because iOS limits how often an app may update it (the in-app screen is the live one).
+
 ## Live speed on the Lock Screen and in the Dynamic Island
 
 While a ride is recording, RideLog shows a Live Activity: on the **Lock Screen** a banner with the speed, distance, a running timer and your top

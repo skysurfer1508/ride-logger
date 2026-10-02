@@ -218,7 +218,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
 
     private func beginTracking() {
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        manager.distanceFilter = 5                       // metres: no stream of jitter while standing at a light, still a fix every second at speed
+        manager.distanceFilter = 5                       // metres: no stream of jitter while standing at a light (it would add fake distance), still a fix every second at speed
         manager.activityType = .automotiveNavigation
         manager.pausesLocationUpdatesAutomatically = false
         manager.allowsBackgroundLocationUpdates = true    // needs UIBackgroundModes: location (project.yml)
@@ -276,12 +276,15 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
             let stamp = Self.wholeSecond(location.timestamp)
             guard stamp >= trip.startedAt else { continue }                              // a cached fix from before Start
             if let last = latest, stamp.timeIntervalSince(last.timestamp) < 1 { continue }   // one fix per second: unique timestamps on the wire
+            let speed = RecordingLogic.trustedSpeed(
+                reported: location.speed, speedAccuracy: location.speedAccuracy, horizontalAccuracy: location.horizontalAccuracy,
+                latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, at: stamp, previous: latest)
             let sample = LocationSample(
                 timestamp: stamp,
                 latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
-                speed: location.speed, altitude: location.altitude,
+                speed: speed, altitude: location.altitude,
                 horizontalAccuracy: location.horizontalAccuracy, verticalAccuracy: location.verticalAccuracy,
-                batteryLevel: Double(UIDevice.current.batteryLevel))
+                batteryLevel: Double(UIDevice.current.batteryLevel), speedAccuracy: location.speedAccuracy)
             do {
                 try store.append(sample, tripId: trip.tripId)
             } catch {

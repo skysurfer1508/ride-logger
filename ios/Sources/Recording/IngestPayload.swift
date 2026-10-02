@@ -25,6 +25,7 @@ enum IngestPayload {
         ]
         if sample.verticalAccuracy >= 0 { properties["altitude"] = sample.altitude }      // an invalid altitude would only add noise to the climb
         if sample.batteryLevel >= 0 { properties["battery_level"] = sample.batteryLevel }
+        if sample.speedAccuracy >= 0 { properties["speed_accuracy"] = sample.speedAccuracy }          // kept in the server's raw_properties; not used by it yet
         return [
             "type": "Feature",
             "geometry": ["type": "Point", "coordinates": [sample.longitude, sample.latitude]],      // GeoJSON order: longitude first
