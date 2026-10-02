@@ -293,8 +293,6 @@ def _windy_get(params: dict) -> dict:
         raise TrafficUnavailable("The webcam service could not be reached.") from e
     if response.status_code in (401, 403):
         raise TrafficUnavailable("The webcam service refused the API key. Check WINDY_API_KEY.")
-    if response.status_code == 400:
-        raise ValueError("bad request")           # caught below: retried without the category filter
     if response.status_code != 200:
         raise TrafficUnavailable(f"The webcam service answered with an error ({response.status_code}).")
     try:
@@ -303,7 +301,12 @@ def _windy_get(params: dict) -> dict:
         raise TrafficUnavailable("The webcam service sent something unreadable.") from e
 
 
-def parse_webcams(data: dict) -> list[dict]:
+# Windy's `categories` filter is an AND ("traffic,city" matches only cameras that are both: none), so each is asked for on its own. Checked against the
+# live API around Zurich: "traffic" has 0 cameras within 25 km (2 within 50 km), "city" has 8 within 25 km; the rest are lakes, mountains and landscapes.
+WEBCAM_CATEGORIES = ("traffic", "city")
+
+
+def parse_webcams(data: dict, category: str = "") -> list[dict]:
     out = []
     for cam in data.get("webcams", []) or []:
         location = cam.get("location") or {}
@@ -322,6 +325,7 @@ def parse_webcams(data: dict) -> list[dict]:
             "preview": current.get("preview") or current.get("thumbnail") or current.get("icon"),
             "detail_url": urls.get("detail"),
             "player_url": player.get("live") or player.get("day"),
+            "category": category,
         })
     return out
 
@@ -331,15 +335,13 @@ def webcams_near(lat: float, lon: float, radius_km: float) -> dict:
         raise TrafficUnavailable("Not set up on the server.")
 
     def load():
-        params = {"nearby": f"{lat:.4f},{lon:.4f},{int(round(radius_km))}", "limit": 50, "include": "location,images,urls,player"}
-        try:
-            data = _windy_get({**params, "categories": "traffic"})
-        except ValueError:                         # this API version did not accept the filter: ask for everything nearby
-            try:
-                data = _windy_get(params)
-            except ValueError as e:
-                raise TrafficUnavailable("The webcam service did not accept the request.") from e
-        return parse_webcams(data)
+        cams: dict[str, dict] = {}
+        for category in WEBCAM_CATEGORIES:
+            params = {"nearby": f"{lat:.4f},{lon:.4f},{int(round(radius_km))}", "limit": 50, "include": "location,images,urls,player",
+                      "categories": category}
+            for cam in parse_webcams(_windy_get(params), category):
+                cams.setdefault(cam["id"], cam)                 # a camera in both lists keeps its first (traffic) label
+        return list(cams.values())
 
     cams = _cached(f"windy:{lat:.2f}:{lon:.2f}:{int(round(radius_km))}", WEBCAMS_TTL_S, load)
     found = [{**c, "distance_km": round(geo.haversine_m(lat, lon, c["lat"], c["lon"]) / 1000, 1)} for c in cams]

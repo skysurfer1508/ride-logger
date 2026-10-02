@@ -152,6 +152,8 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(first.preview, "https://img.example/111.jpg")
         XCTAssertEqual(first.detailUrl, "https://windy.example/111")
         XCTAssertEqual(first.playerUrl, "https://player.example/111")
+        XCTAssertEqual(first.category, "traffic")                                   // the fake answers every category with the same list: the first label wins
+        XCTAssertTrue(first.isTrafficCamera)
         XCTAssertNil(result.webcams[1].preview)
         XCTAssertNil(result.webcams[1].detailUrl)
     }

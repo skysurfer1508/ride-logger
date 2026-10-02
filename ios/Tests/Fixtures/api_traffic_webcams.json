@@ -2,6 +2,7 @@
  "api": 1,
  "webcams": [
   {
+   "category": "traffic",
    "detail_url": "https://windy.example/111",
    "distance_km": 1.9,
    "id": "111",
@@ -12,6 +13,7 @@
    "title": "Hardbrucke"
   },
   {
+   "category": "traffic",
    "detail_url": null,
    "distance_km": 30.2,
    "id": "222",

@@ -83,9 +83,11 @@ A map of your surroundings with three layers you can switch on and off (the chip
   Switzerland); the **Works** chip adds roadworks and closures (about 1,700, titled from the feed: "Road closed", "Narrow lanes", ...). Tap a pin for the
   description and how long it lasts. Most records come with only AlertC location codes, which the server turns into map positions with Switzerland's TMC
   location tables (three small open-data files, downloaded once into the data folder on first use, about 4 MB, never committed to git).
-- **Webcams** (needs a free key): public webcams near the map from the Windy Webcams API, as a snapshot with a link to the live view. Windy's free service
-  only allows linking to its own player and its picture links expire after 15 minutes, so a picture is a snapshot and may be several minutes old. There are
-  few real *traffic* cameras: ASTRA switched its public Zurich motorway cameras off in 2020 (data protection), so what exists is mostly city and scenic cams.
+- **Webcams** (needs a free key): public webcams near the map from the Windy Webcams API, as a snapshot with a link to the live view. Two kinds are asked for:
+  *traffic* cameras and *city* cameras. **Expect few real traffic cameras**: checked against the live API on the day this was built, Windy has none in the
+  "traffic" category within 25 km of Zurich centre (2 within 50 km), but 8 city cameras within 25 km (the Stadthaus, Sechselaeutenplatz, ...). A city
+  camera may or may not show a road, and the sheet says which kind it is. ASTRA switched its public Zurich motorway cameras off in 2020 (data protection).
+  Windy's free service only allows linking to its own player and its picture links expire after 15 minutes, so a picture is a snapshot, several minutes old.
 
 A layer without a key shows a padlock; tapping it says what to add. Keys live **on your server only** (never in the app):
 
@@ -95,8 +97,8 @@ A layer without a key shows a padlock; tapping it says what to add. Keys live **
 
 **What has and has not been checked against the live services.** Incidents: the request format was found by trying it with a real key and the parser was
 built and run against a real capture of the feed (3,157 records, 0.6 s to read, every code that was needed resolved to a position). What is still unverified
-is the app side on a phone, and webcams: nobody had a Windy key, so that code only ran against fake answers. `python -m app.cli check-traffic` calls each
-source once and prints what came back (with the raw start of the answer if nothing could be read): if a layer fails, send that output to Claude Code.
+is the app side on a phone. `python -m app.cli check-traffic` calls each
+source once and prints what came back (with the raw start of the answer if nothing could be read): if a layer fails, send that output to Claude Code. Webcams were run against the live API with a real key on 2026-10-02 (the key is accepted and the answers parse); what has not been tried yet is how they look on a phone.
 
 The feed's limits are 5 calls per minute; the server fetches it at most once every 5 minutes and shares the answer with everyone.
 

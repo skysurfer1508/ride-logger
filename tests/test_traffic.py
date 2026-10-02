@@ -215,42 +215,61 @@ def test_a_network_error_is_unavailable_not_a_crash(monkeypatch):
 # ---------------------------------------------------------------------------------------------------------------------------- webcams --
 
 def test_webcams_are_normalised_and_the_broken_one_dropped():
-    cams = traffic.parse_webcams(WINDY_JSON)
+    cams = traffic.parse_webcams(WINDY_JSON, "city")
     assert [c["id"] for c in cams] == ["111", "222"]
     assert cams[0] == {"id": "111", "title": "Hardbrucke", "lat": 47.3869, "lon": 8.5217, "preview": "https://img.example/111.jpg",
-                       "detail_url": "https://windy.example/111", "player_url": "https://player.example/111"}
+                       "detail_url": "https://windy.example/111", "player_url": "https://player.example/111", "category": "city"}
     assert cams[1]["preview"] is None and cams[1]["detail_url"] is None
 
 
-def test_webcams_near_sorts_by_distance_and_asks_for_traffic_cams(monkeypatch):
-    seen = []
-    monkeypatch.setattr(traffic, "_windy_get", lambda params: seen.append(params) or WINDY_JSON)
-    result = traffic.webcams_near(*ZURICH, 15)
-    assert [c["id"] for c in result["webcams"]] == ["111", "222"]
-    assert seen[0]["categories"] == "traffic" and seen[0]["nearby"] == "47.3769,8.5417,15"
-    assert "images" in seen[0]["include"] and "player" in seen[0]["include"]
-
-
-def test_the_category_filter_is_dropped_if_the_service_rejects_it(monkeypatch):
+def test_traffic_and_city_cameras_are_asked_for_separately_and_merged(monkeypatch):
     seen = []
     def fake(params):
         seen.append(dict(params))
-        if "categories" in params:
-            raise ValueError("bad request")
-        return WINDY_JSON
+        if params["categories"] == "traffic":
+            return {"webcams": [{"webcamId": 1, "title": "A1 Gubrist", "location": {"latitude": 47.42, "longitude": 8.45}}]}
+        return {"webcams": [{"webcamId": 2, "title": "Sechselaeutenplatz", "location": {"latitude": 47.366, "longitude": 8.54}},
+                            {"webcamId": 1, "title": "A1 Gubrist (again)", "location": {"latitude": 47.42, "longitude": 8.45}}]}
     monkeypatch.setattr(traffic, "_windy_get", fake)
-    assert len(traffic.webcams_near(*ZURICH, 15)["webcams"]) == 2
-    assert ["categories" in p for p in seen] == [True, False]
+    cams = {c["id"]: c for c in traffic.webcams_near(*ZURICH, 15)["webcams"]}
+    assert [p["categories"] for p in seen] == ["traffic", "city"]
+    assert seen[0]["nearby"] == "47.3769,8.5417,15" and "images" in seen[0]["include"] and "player" in seen[0]["include"]
+    assert set(cams) == {"1", "2"}                                                              # the camera in both lists appears once
+    assert (cams["1"]["category"], cams["1"]["title"]) == ("traffic", "A1 Gubrist")             # ...with its traffic label
+    assert cams["2"]["category"] == "city"
+
+
+def test_webcams_come_back_nearest_first(monkeypatch):
+    monkeypatch.setattr(traffic, "_windy_get", lambda params: WINDY_JSON)
+    result = traffic.webcams_near(*ZURICH, 15)
+    assert [c["id"] for c in result["webcams"]] == ["111", "222"]
+    assert [c["distance_km"] for c in result["webcams"]] == sorted(c["distance_km"] for c in result["webcams"])
+
+
+def test_an_area_with_no_cameras_is_an_empty_list_not_an_error(monkeypatch):
+    monkeypatch.setattr(traffic, "_windy_get", lambda params: {"webcams": []})
+    assert traffic.webcams_near(*ZURICH, 15) == {"webcams": []}
+
+
+def test_a_failure_in_either_request_is_reported(monkeypatch):
+    def fake(params):
+        if params["categories"] == "city":
+            raise traffic.TrafficUnavailable("The webcam service answered with an error (503).")
+        return {"webcams": []}
+    monkeypatch.setattr(traffic, "_windy_get", fake)
+    with pytest.raises(traffic.TrafficUnavailable):
+        traffic.webcams_near(*ZURICH, 15)
 
 
 def test_webcam_answers_are_cached_briefly_per_area(monkeypatch):
     calls = []
     monkeypatch.setattr(traffic, "_windy_get", lambda params: calls.append(1) or WINDY_JSON)
     traffic.webcams_near(*ZURICH, 15)
+    assert len(calls) == 2                                              # one request per category
     traffic.webcams_near(47.3771, 8.5419, 15)                          # the same spot to two decimals
-    assert len(calls) == 1
-    traffic.webcams_near(46.95, 7.45, 15)
     assert len(calls) == 2
+    traffic.webcams_near(46.95, 7.45, 15)
+    assert len(calls) == 4
     assert traffic.WEBCAMS_TTL_S < 15 * 60                              # Windy's free image links expire after 15 minutes
 
 

@@ -44,7 +44,11 @@ struct TrafficWebcam: Decodable, Identifiable, Hashable {
     let preview: String?
     let detailUrl: String?
     let playerUrl: String?
+    /// "traffic" (a camera Windy files under traffic) or "city" (a city camera: it may or may not show a street).
+    let category: String
     let distanceKm: Double
+
+    var isTrafficCamera: Bool { category == "traffic" }
 }
 
 struct WebcamsResponse: Decodable {

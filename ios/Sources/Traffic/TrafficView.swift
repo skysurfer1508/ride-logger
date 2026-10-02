@@ -342,6 +342,8 @@ struct WebcamSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(webcam.title).font(.headline).foregroundStyle(Theme.text)
                     Text(TrafficLogic.distanceText(webcam.distanceKm) + " away").font(.subheadline).foregroundStyle(Theme.muted)
+                    Text(webcam.isTrafficCamera ? "Traffic camera" : "City webcam: it may or may not show a road.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
                     if let preview = webcam.preview, let url = URL(string: preview) {
                         AsyncImage(url: url) { phase in
                             switch phase {
