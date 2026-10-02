@@ -85,6 +85,11 @@ extension WatchSession: WCSessionDelegate {
         Task { @MainActor in self.apply(message) }
     }
 
+    /// The phone's "are you there?" from Settings > Apple Watch > Test connection.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        replyHandler([WatchKeys.pong: true])
+    }
+
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         Task { @MainActor in self.apply(applicationContext) }
     }

@@ -113,4 +113,44 @@ final class WatchProtocolTests: XCTestCase {
         XCTAssertNil(WatchCommand(rawValue: "explode"))
         XCTAssertEqual(WatchKeys.command, "cmd")
     }
+
+    // MARK: link state
+
+    func testTheLinkStateFollowsTheFactsInOrder() {
+        func state(_ supported: Bool = true, _ activated: Bool = true, _ paired: Bool = true, _ installed: Bool = true, _ reachable: Bool = true) -> WatchLinkState {
+            WatchLinkState.from(supported: supported, activated: activated, paired: paired, installed: installed, reachable: reachable)
+        }
+        XCTAssertEqual(state(false), .unsupported)
+        XCTAssertEqual(state(true, false), .starting)
+        XCTAssertEqual(state(true, true, false), .notPaired)
+        XCTAssertEqual(state(true, true, true, false), .appNotInstalled)
+        XCTAssertEqual(state(true, true, true, true, false), .outOfReach)
+        XCTAssertEqual(state(), .connected)
+        XCTAssertEqual(state(true, true, false, false, true), .notPaired)                    // the first missing thing is the one reported
+        XCTAssertEqual(state(false, false, false, false, false), .unsupported)
+    }
+
+    func testEveryStateSaysWhatToDoAndOnlyConnectedIsGood() {
+        let all: [WatchLinkState] = [.unsupported, .starting, .notPaired, .appNotInstalled, .outOfReach, .connected]
+        for state in all {
+            XCTAssertFalse(state.title.isEmpty)
+            XCTAssertFalse(state.detail.isEmpty)
+            XCTAssertEqual(state.isGood, state == .connected)
+        }
+        XCTAssertTrue(WatchLinkState.appNotInstalled.detail.contains("RideLogWatch"))
+        XCTAssertTrue(WatchLinkState.outOfReach.detail.contains("Open RideLog on the watch"))
+    }
+
+    func testTheRecordScreenOnlyMentionsAWatchThatExists() {
+        XCTAssertFalse(WatchLinkState.unsupported.showsOnRecordScreen)
+        XCTAssertFalse(WatchLinkState.notPaired.showsOnRecordScreen)
+        XCTAssertTrue(WatchLinkState.appNotInstalled.showsOnRecordScreen)
+        XCTAssertTrue(WatchLinkState.outOfReach.showsOnRecordScreen)
+        XCTAssertTrue(WatchLinkState.connected.showsOnRecordScreen)
+    }
+
+    func testThePingKeysAreWhatBothSidesUse() {
+        XCTAssertEqual(WatchKeys.ping, "ping")
+        XCTAssertEqual(WatchKeys.pong, "pong")
+    }
 }

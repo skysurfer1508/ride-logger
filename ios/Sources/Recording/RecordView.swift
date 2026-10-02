@@ -199,6 +199,7 @@ private struct RecordingDashboard: View {
                     Text(Format.clock(seconds: recorder.elapsed)).font(Theme.readout(30))
                 }
                 Spacer()
+                WatchChip()
                 GPSChip(quality: RecordingLogic.quality(of: recorder.latest, now: now), accuracy: recorder.latest?.horizontalAccuracy)
             }
             .foregroundStyle(Theme.text)
@@ -240,6 +241,31 @@ private struct RecordingDashboard: View {
             .tint(Theme.danger)
         }
         .padding(16)
+    }
+}
+
+/// A small watch icon next to the GPS chip: green when the watch can see the phone, amber when it is installed but out of reach. Nothing without a watch.
+private struct WatchChip: View {
+    @ObservedObject private var watch = WatchBridge.shared
+
+    var body: some View {
+        if watch.link.showsOnRecordScreen {
+            Image(systemName: "applewatch")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(color.opacity(0.18), in: Capsule())
+                .foregroundStyle(color)
+                .accessibilityLabel("Apple Watch: \(watch.link.title)")
+                .onAppear { watch.refreshLink() }
+        }
+    }
+
+    private var color: Color {
+        switch watch.link {
+        case .connected: return Theme.success
+        case .outOfReach, .starting: return Theme.accent
+        default: return Theme.muted
+        }
     }
 }
 

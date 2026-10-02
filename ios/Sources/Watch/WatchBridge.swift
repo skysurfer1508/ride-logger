@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import WatchConnectivity
 
@@ -7,8 +8,15 @@ import WatchConnectivity
 /// Nothing here is needed to record: with no Watch (or no Watch app installed) it does nothing. The Watch app is a separate target that the iPhone app neither
 /// depends on nor embeds (see project.yml), so a problem with it can never stop this app from building.
 @MainActor
-final class WatchBridge: NSObject, WCSessionDelegate {
+final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = WatchBridge()
+
+    /// Whether the watch can be reached right now, for the Settings panel and the Record screen's chip.
+    @Published private(set) var link: WatchLinkState = .starting
+    /// The last time the watch said anything (a command, or an answer to the test).
+    @Published private(set) var lastContact: Date?
+    @Published private(set) var testing = false
+    @Published private(set) var testResult: String?
 
     private var recorder: RideRecorder?
     private var timer: Timer?
@@ -25,9 +33,50 @@ final class WatchBridge: NSObject, WCSessionDelegate {
         let session = WCSession.default
         session.delegate = self
         session.activate()
+        refreshLink()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+    }
+
+    // MARK: is the watch there?
+
+    /// Reads what WatchConnectivity knows and turns it into one state.
+    func refreshLink() {
+        guard WCSession.isSupported() else {
+            link = .unsupported
+            return
+        }
+        let session = WCSession.default
+        link = WatchLinkState.from(supported: true, activated: session.activationState == .activated, paired: session.isPaired,
+                                   installed: session.isWatchAppInstalled, reachable: session.isReachable)
+    }
+
+    /// Sends the watch a ping and says whether and how fast it answered.
+    func testConnection() {
+        refreshLink()
+        testResult = nil
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isWatchAppInstalled, session.isReachable else {
+            testResult = link.isGood ? "The watch is not answering." : link.detail
+            return
+        }
+        testing = true
+        let started = Date()
+        session.sendMessage([WatchKeys.ping: true], replyHandler: { _ in
+            Task { @MainActor in
+                self.testing = false
+                self.lastContact = Date()
+                self.testResult = String(format: "The watch answered in %.1f s.", Date().timeIntervalSince(started))
+                self.refreshLink()
+            }
+        }, errorHandler: { _ in
+            Task { @MainActor in
+                self.testing = false
+                self.testResult = "The watch did not answer. Open RideLog on the watch and try again."
+                self.refreshLink()
+            }
+        })
     }
 
     // MARK: sending
@@ -82,6 +131,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
     // MARK: what the Watch asks for
 
     private func handle(command raw: String?) async -> [String: Any] {
+        lastContact = Date()
         guard let raw, let command = WatchCommand(rawValue: raw), let recorder else {
             return [WatchKeys.ok: false, WatchKeys.text: "RideLog did not understand that."]
         }
@@ -102,7 +152,17 @@ final class WatchBridge: NSObject, WCSessionDelegate {
 
     // MARK: WCSessionDelegate
 
-    nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        Task { @MainActor in self.refreshLink() }
+    }
+
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        Task { @MainActor in self.refreshLink() }
+    }
+
+    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+        Task { @MainActor in self.refreshLink() }
+    }
 
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
 

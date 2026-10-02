@@ -9,6 +9,7 @@ struct SettingsView: View {
     @ObservedObject var autoStart: AutoStartCoordinator
     @AppStorage("keepScreenOn") private var keepScreenOn = true
     @AppStorage(InsightsLogic.showLimitsKey) private var showSpeedLimits = true
+    @ObservedObject private var watch = WatchBridge.shared
     @State private var localRides: [RideRecorder.LocalRide] = []
     @State private var deleteTarget: RideRecorder.LocalRide?
 
@@ -56,6 +57,7 @@ struct SettingsView: View {
                     accountPanel
                     recordingPanel
                     insightsPanel
+                    watchPanel
                     AutoStartPanel(coordinator: autoStart, recorder: recorder)
                     dataPanel
                     overlandPanel
@@ -123,6 +125,33 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var watchPanel: some View {
+        Panel(title: "Apple Watch") {
+            HStack(spacing: 10) {
+                Circle().fill(watch.link.isGood ? Theme.success : (watch.link == .outOfReach ? Theme.accent : Theme.muted)).frame(width: 12, height: 12)
+                Text(watch.link.title).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Apple Watch: \(watch.link.title)")
+            Text(watch.link.detail).font(.footnote).foregroundStyle(Theme.muted)
+            if let last = watch.lastContact {
+                Text("Last heard from the watch \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(Theme.muted)
+            }
+            if watch.link == .outOfReach || watch.link == .connected {
+                Button { watch.testConnection() } label: {
+                    HStack(spacing: 8) {
+                        if watch.testing { ProgressView().controlSize(.small) }
+                        Text("Test connection")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(watch.testing)
+            }
+            if let result = watch.testResult { Text(result).font(.footnote).foregroundStyle(Theme.text) }
+        }
+        .onAppear { watch.refreshLink() }
     }
 
     private var insightsPanel: some View {
