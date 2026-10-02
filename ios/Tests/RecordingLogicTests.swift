@@ -1,9 +1,9 @@
 import XCTest
 
 func makeSample(_ seconds: Double, lat: Double = 47.0, lon: Double = 8.0, speed: Double = 10, accuracy: Double = 5,
-                altitude: Double = 400, verticalAccuracy: Double = 8, battery: Double = 0.8, speedAccuracy: Double = -1) -> LocationSample {
+                altitude: Double = 400, verticalAccuracy: Double = 8, battery: Double = 0.8, speedAccuracy: Double = -1, course: Double = -1, courseAccuracy: Double = -1) -> LocationSample {
     LocationSample(timestamp: Date(timeIntervalSince1970: 1_790_586_900 + seconds), latitude: lat, longitude: lon, speed: speed,
-                   altitude: altitude, horizontalAccuracy: accuracy, verticalAccuracy: verticalAccuracy, batteryLevel: battery, speedAccuracy: speedAccuracy)
+                   altitude: altitude, horizontalAccuracy: accuracy, verticalAccuracy: verticalAccuracy, batteryLevel: battery, speedAccuracy: speedAccuracy, course: course, courseAccuracy: courseAccuracy)
 }
 
 final class LiveStatsTests: XCTestCase {
@@ -195,6 +195,26 @@ final class TrustedSpeedTests: XCTestCase {
         let sample = try decoder.decode(LocationSample.self, from: Data(json.utf8))
         XCTAssertEqual(sample.speed, 12.5)
         XCTAssertEqual(sample.speedAccuracy, -1)
+    }
+
+    func testSamplesSavedBeforeTheCourseExistedStillLoadWithoutOne() throws {
+        let json = #"{"timestamp":"2026-09-28T09:15:00Z","latitude":47.0,"longitude":8.0,"speed":12.5,"altitude":400,"horizontalAccuracy":5,"verticalAccuracy":8,"batteryLevel":0.8,"speedAccuracy":0.4}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sample = try decoder.decode(LocationSample.self, from: Data(json.utf8))
+        XCTAssertEqual(sample.course, -1)
+        XCTAssertEqual(sample.courseAccuracy, -1)
+    }
+
+    func testTheCourseIsKeptWhenASampleIsSavedAndRead() throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sample = makeSample(5, speed: 8.2, course: 271.5, courseAccuracy: 3)
+        let back = try decoder.decode(LocationSample.self, from: encoder.encode(sample))
+        XCTAssertEqual(back, sample)
+        XCTAssertEqual(back.course, 271.5)
     }
 
     func testTheSpeedAccuracyIsKeptWhenASampleIsSavedAndRead() throws {

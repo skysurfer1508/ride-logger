@@ -14,6 +14,8 @@
    "lon": 8.5417,
    "speed": 18.0,
    "speed_accuracy": 0.3,
+   "course": 0.0,
+   "course_accuracy": 2.0,
    "altitude": 410.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -25,6 +27,8 @@
    "lon": 8.5423,
    "speed": 19.5,
    "speed_accuracy": 0.4,
+   "course": 7.3,
+   "course_accuracy": 2.5,
    "altitude": 410.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -36,6 +40,8 @@
    "lon": 8.5429,
    "speed": 21.0,
    "speed_accuracy": 0.5,
+   "course": 14.6,
+   "course_accuracy": 3.0,
    "altitude": 413.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -47,6 +53,8 @@
    "lon": 8.5435,
    "speed": 22.5,
    "speed_accuracy": 0.3,
+   "course": 21.9,
+   "course_accuracy": 2.0,
    "altitude": 413.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -58,6 +66,8 @@
    "lon": 8.5441,
    "speed": 24.0,
    "speed_accuracy": 0.4,
+   "course": 29.2,
+   "course_accuracy": 2.5,
    "altitude": 416.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -69,6 +79,8 @@
    "lon": 8.5447,
    "speed": 18.0,
    "speed_accuracy": 0.5,
+   "course": 36.5,
+   "course_accuracy": 3.0,
    "altitude": 416.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -80,6 +92,8 @@
    "lon": 8.5453,
    "speed": 19.5,
    "speed_accuracy": 0.3,
+   "course": 43.8,
+   "course_accuracy": 2.0,
    "altitude": 419.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -91,6 +105,8 @@
    "lon": 8.5459,
    "speed": 21.0,
    "speed_accuracy": 0.4,
+   "course": 51.1,
+   "course_accuracy": 2.5,
    "altitude": 419.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -102,6 +118,8 @@
    "lon": 8.5465,
    "speed": 22.5,
    "speed_accuracy": 0.5,
+   "course": 58.4,
+   "course_accuracy": 3.0,
    "altitude": 422.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -113,6 +131,8 @@
    "lon": 8.5471,
    "speed": 24.0,
    "speed_accuracy": 0.3,
+   "course": 65.7,
+   "course_accuracy": 2.0,
    "altitude": 422.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -124,6 +144,8 @@
    "lon": 8.5477,
    "speed": 18.0,
    "speed_accuracy": 0.4,
+   "course": 73.0,
+   "course_accuracy": 2.5,
    "altitude": 425.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -135,6 +157,8 @@
    "lon": 8.5483,
    "speed": 19.5,
    "speed_accuracy": 0.5,
+   "course": 80.3,
+   "course_accuracy": 3.0,
    "altitude": 425.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -146,6 +170,8 @@
    "lon": 8.5489,
    "speed": 21.0,
    "speed_accuracy": 0.3,
+   "course": 87.6,
+   "course_accuracy": 2.0,
    "altitude": 428.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -157,6 +183,8 @@
    "lon": 8.5495,
    "speed": 22.5,
    "speed_accuracy": 0.4,
+   "course": 94.9,
+   "course_accuracy": 2.5,
    "altitude": 428.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -168,6 +196,8 @@
    "lon": 8.5501,
    "speed": 24.0,
    "speed_accuracy": 0.5,
+   "course": 102.2,
+   "course_accuracy": 3.0,
    "altitude": 431.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -179,6 +209,8 @@
    "lon": 8.5507,
    "speed": 18.0,
    "speed_accuracy": 0.3,
+   "course": 109.5,
+   "course_accuracy": 2.0,
    "altitude": 431.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -190,6 +222,8 @@
    "lon": 8.5513,
    "speed": 19.5,
    "speed_accuracy": 0.4,
+   "course": 116.8,
+   "course_accuracy": 2.5,
    "altitude": 434.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -201,6 +235,8 @@
    "lon": 8.5519,
    "speed": 21.0,
    "speed_accuracy": 0.5,
+   "course": 124.1,
+   "course_accuracy": 3.0,
    "altitude": 434.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -212,6 +248,8 @@
    "lon": 8.5525,
    "speed": 22.5,
    "speed_accuracy": 0.3,
+   "course": 131.4,
+   "course_accuracy": 2.0,
    "altitude": 437.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -223,6 +261,8 @@
    "lon": 8.5531,
    "speed": 24.0,
    "speed_accuracy": 0.4,
+   "course": 138.7,
+   "course_accuracy": 2.5,
    "altitude": 437.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -234,6 +274,8 @@
    "lon": 8.5537,
    "speed": 18.0,
    "speed_accuracy": 0.5,
+   "course": 146.0,
+   "course_accuracy": 3.0,
    "altitude": 440.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -245,6 +287,8 @@
    "lon": 8.5543,
    "speed": 19.5,
    "speed_accuracy": 0.3,
+   "course": 153.3,
+   "course_accuracy": 2.0,
    "altitude": 440.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -256,6 +300,8 @@
    "lon": 8.5549,
    "speed": 21.0,
    "speed_accuracy": 0.4,
+   "course": 160.6,
+   "course_accuracy": 2.5,
    "altitude": 443.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -267,6 +313,8 @@
    "lon": 8.5555,
    "speed": 22.5,
    "speed_accuracy": 0.5,
+   "course": 167.9,
+   "course_accuracy": 3.0,
    "altitude": 443.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -278,6 +326,8 @@
    "lon": 8.5561,
    "speed": 24.0,
    "speed_accuracy": 0.3,
+   "course": 175.2,
+   "course_accuracy": 2.0,
    "altitude": 446.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -289,6 +339,8 @@
    "lon": 8.5567,
    "speed": 18.0,
    "speed_accuracy": 0.4,
+   "course": 182.5,
+   "course_accuracy": 2.5,
    "altitude": 446.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -300,6 +352,8 @@
    "lon": 8.5573,
    "speed": 19.5,
    "speed_accuracy": 0.5,
+   "course": 189.8,
+   "course_accuracy": 3.0,
    "altitude": 449.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -311,6 +365,8 @@
    "lon": 8.5579,
    "speed": 21.0,
    "speed_accuracy": 0.3,
+   "course": 197.1,
+   "course_accuracy": 2.0,
    "altitude": 449.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -322,6 +378,8 @@
    "lon": 8.5585,
    "speed": 22.5,
    "speed_accuracy": 0.4,
+   "course": 204.4,
+   "course_accuracy": 2.5,
    "altitude": 452.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -333,6 +391,8 @@
    "lon": 8.5591,
    "speed": 24.0,
    "speed_accuracy": 0.5,
+   "course": 211.7,
+   "course_accuracy": 3.0,
    "altitude": 452.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -344,6 +404,8 @@
    "lon": 8.5597,
    "speed": 18.0,
    "speed_accuracy": 0.3,
+   "course": 219.0,
+   "course_accuracy": 2.0,
    "altitude": 455.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -355,6 +417,8 @@
    "lon": 8.5603,
    "speed": 19.5,
    "speed_accuracy": 0.4,
+   "course": 226.3,
+   "course_accuracy": 2.5,
    "altitude": 455.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -366,6 +430,8 @@
    "lon": 8.5609,
    "speed": 21.0,
    "speed_accuracy": 0.5,
+   "course": 233.6,
+   "course_accuracy": 3.0,
    "altitude": 458.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -377,6 +443,8 @@
    "lon": 8.5615,
    "speed": 22.5,
    "speed_accuracy": 0.3,
+   "course": 240.9,
+   "course_accuracy": 2.0,
    "altitude": 458.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -388,6 +456,8 @@
    "lon": 8.5621,
    "speed": 24.0,
    "speed_accuracy": 0.4,
+   "course": 248.2,
+   "course_accuracy": 2.5,
    "altitude": 461.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -399,6 +469,8 @@
    "lon": 8.5627,
    "speed": 18.0,
    "speed_accuracy": 0.5,
+   "course": 255.5,
+   "course_accuracy": 3.0,
    "altitude": 461.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -410,6 +482,8 @@
    "lon": 8.5633,
    "speed": 19.5,
    "speed_accuracy": 0.3,
+   "course": 262.8,
+   "course_accuracy": 2.0,
    "altitude": 464.0,
    "horizontal_accuracy": 5.0,
    "vertical_accuracy": 8.0,
@@ -421,6 +495,8 @@
    "lon": 8.5639,
    "speed": 21.0,
    "speed_accuracy": 0.4,
+   "course": 270.1,
+   "course_accuracy": 2.5,
    "altitude": 464.0,
    "horizontal_accuracy": 6.0,
    "vertical_accuracy": 8.0,
@@ -432,6 +508,8 @@
    "lon": 8.5645,
    "speed": 22.5,
    "speed_accuracy": 0.5,
+   "course": 277.4,
+   "course_accuracy": 3.0,
    "altitude": 467.0,
    "horizontal_accuracy": 7.0,
    "vertical_accuracy": 8.0,
@@ -443,6 +521,8 @@
    "lon": 8.5651,
    "speed": 24.0,
    "speed_accuracy": 0.3,
+   "course": 284.7,
+   "course_accuracy": 2.0,
    "altitude": 467.0,
    "horizontal_accuracy": 8.0,
    "vertical_accuracy": 8.0,
@@ -468,6 +548,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.82,
      "speed_accuracy": 0.3,
+     "course": 0.0,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -489,6 +571,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.819,
      "speed_accuracy": 0.4,
+     "course": 7.3,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -510,6 +594,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.818,
      "speed_accuracy": 0.5,
+     "course": 14.6,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -531,6 +617,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.817,
      "speed_accuracy": 0.3,
+     "course": 21.9,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -552,6 +640,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.816,
      "speed_accuracy": 0.4,
+     "course": 29.2,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -573,6 +663,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.815,
      "speed_accuracy": 0.5,
+     "course": 36.5,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -594,6 +686,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.814,
      "speed_accuracy": 0.3,
+     "course": 43.8,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -615,6 +709,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.813,
      "speed_accuracy": 0.4,
+     "course": 51.1,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -636,6 +732,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.812,
      "speed_accuracy": 0.5,
+     "course": 58.4,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -657,6 +755,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.811,
      "speed_accuracy": 0.3,
+     "course": 65.7,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -678,6 +778,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.81,
      "speed_accuracy": 0.4,
+     "course": 73.0,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -699,6 +801,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.809,
      "speed_accuracy": 0.5,
+     "course": 80.3,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -720,6 +824,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.808,
      "speed_accuracy": 0.3,
+     "course": 87.6,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -741,6 +847,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.807,
      "speed_accuracy": 0.4,
+     "course": 94.9,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -762,6 +870,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.806,
      "speed_accuracy": 0.5,
+     "course": 102.2,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -783,6 +893,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.805,
      "speed_accuracy": 0.3,
+     "course": 109.5,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -804,6 +916,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.804,
      "speed_accuracy": 0.4,
+     "course": 116.8,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -825,6 +939,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.803,
      "speed_accuracy": 0.5,
+     "course": 124.1,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -846,6 +962,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.802,
      "speed_accuracy": 0.3,
+     "course": 131.4,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -867,6 +985,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.801,
      "speed_accuracy": 0.4,
+     "course": 138.7,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -888,6 +1008,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.8,
      "speed_accuracy": 0.5,
+     "course": 146.0,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -909,6 +1031,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.799,
      "speed_accuracy": 0.3,
+     "course": 153.3,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -930,6 +1054,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.798,
      "speed_accuracy": 0.4,
+     "course": 160.6,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -951,6 +1077,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.797,
      "speed_accuracy": 0.5,
+     "course": 167.9,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -972,6 +1100,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.796,
      "speed_accuracy": 0.3,
+     "course": 175.2,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -993,6 +1123,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.795,
      "speed_accuracy": 0.4,
+     "course": 182.5,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1014,6 +1146,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.794,
      "speed_accuracy": 0.5,
+     "course": 189.8,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1035,6 +1169,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.793,
      "speed_accuracy": 0.3,
+     "course": 197.1,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1056,6 +1192,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.792,
      "speed_accuracy": 0.4,
+     "course": 204.4,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1077,6 +1215,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.791,
      "speed_accuracy": 0.5,
+     "course": 211.7,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1098,6 +1238,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.79,
      "speed_accuracy": 0.3,
+     "course": 219.0,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1119,6 +1261,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.789,
      "speed_accuracy": 0.4,
+     "course": 226.3,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1140,6 +1284,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.788,
      "speed_accuracy": 0.5,
+     "course": 233.6,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1161,6 +1307,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.787,
      "speed_accuracy": 0.3,
+     "course": 240.9,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1182,6 +1330,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.786,
      "speed_accuracy": 0.4,
+     "course": 248.2,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1203,6 +1353,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.785,
      "speed_accuracy": 0.5,
+     "course": 255.5,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1224,6 +1376,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.784,
      "speed_accuracy": 0.3,
+     "course": 262.8,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1245,6 +1399,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.783,
      "speed_accuracy": 0.4,
+     "course": 270.1,
+     "course_accuracy": 2.5,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1266,6 +1422,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.782,
      "speed_accuracy": 0.5,
+     "course": 277.4,
+     "course_accuracy": 3.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }
@@ -1287,6 +1445,8 @@
      "vertical_accuracy": 8.0,
      "battery_level": 0.781,
      "speed_accuracy": 0.3,
+     "course": 284.7,
+     "course_accuracy": 2.0,
      "device_id": "ridelog-ios-TEST0001",
      "trip_id": "2026-09-28T09:15:00Z#a1b2c3d4"
     }

@@ -67,6 +67,21 @@ def test_a_whole_app_ride_becomes_one_ride_with_the_right_numbers(anon, doc):
     assert rows("SELECT COUNT(*) c FROM points WHERE ride_id IS NULL")[0]["c"] == 0
 
 
+def test_the_phones_course_is_stored_and_reaches_the_lean_estimate(anon, doc):
+    """The app sends `course` / `course_accuracy` with each fix; the points query hands them to the ride's analysis (app/views.get_ride_points)."""
+    from app import views
+    post(anon, doc["body"])
+    (ride,) = rows("SELECT id FROM rides")
+    conn = get_db()
+    try:
+        stored = views.get_ride_points(conn, ALICE["sub"], ride["id"])
+    finally:
+        conn.close()
+    assert [round(r["course"], 1) for r in stored] == [s["course"] for s in doc["samples"]]
+    assert [r["course_accuracy"] for r in stored] == [s["course_accuracy"] for s in doc["samples"]]
+    assert all(p["course"] is not None for p in __import__("app.processing", fromlist=["x"])._rows_to_points(stored))
+
+
 def test_the_ride_shows_up_in_the_api_the_app_reads(alice, doc):
     post(alice, doc["body"])
     data = alice.get("/api/v1/rides").json()["rides"]

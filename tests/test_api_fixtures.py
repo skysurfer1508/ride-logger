@@ -18,7 +18,7 @@ import pytest
 from conftest import ALICE, add_ride, add_token
 from app.db import get_db
 from test_track import insert_points
-from trackgen import make_rows
+from trackgen import make_path_rows, make_rows
 
 FIXTURES = Path(__file__).resolve().parent.parent / "ios" / "Tests" / "Fixtures"
 ENDPOINTS = {
@@ -114,9 +114,14 @@ def seeded(alice, monkeypatch):
 def test_fixture_matches_the_live_api(name, alice, seeded):
     insights_ride_id = None
     if name == "api_insights":
-        # fast, a hard stop and a hard getaway: over the 80 limit, with a braking and an acceleration event. Added only here so the other fixtures keep their three rides.
-        insights_ride_id = add_ride(ALICE["sub"], datetime.now(timezone.utc).isoformat(), distance_m=5000, duration_s=300, points=150)
-        insert_points(ALICE["sub"], insights_ride_id, make_rows([("drive", 120, 25.0), ("drive", 60, 3.0), ("drive", 100, 22.0)]))
+        # 90 km/h (over the 80 limit) through a right-hander, then a hard stop and a hard getaway: a corner with its lean, a braking and an acceleration event.
+        # Added only here so the other fixtures keep their three rides.
+        insights_ride_id = add_ride(ALICE["sub"], datetime.now(timezone.utc).isoformat(), distance_m=3200, duration_s=130, points=130)
+        rows = make_path_rows([("straight", 1500), ("turn", 150, 90), ("straight", 1500)], 25, course_sigma=1.0)
+        for i in (100, 101):
+            rows[i]["speed"] = 3.0
+        rows[102]["speed"] = 22.0
+        insert_points(ALICE["sub"], insights_ride_id, rows)
     path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1, insights_ride_id=insights_ride_id)
     response = alice.get(path)
     assert response.status_code == 200

@@ -294,7 +294,8 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
                 latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
                 speed: speed, altitude: location.altitude,
                 horizontalAccuracy: location.horizontalAccuracy, verticalAccuracy: location.verticalAccuracy,
-                batteryLevel: Double(UIDevice.current.batteryLevel), speedAccuracy: location.speedAccuracy)
+                batteryLevel: Double(UIDevice.current.batteryLevel), speedAccuracy: location.speedAccuracy,
+                course: location.course, courseAccuracy: location.courseAccuracy)
             do {
                 try store.append(sample, tripId: trip.tripId)
             } catch {

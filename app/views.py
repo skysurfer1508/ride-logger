@@ -149,7 +149,9 @@ def get_ride_points(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> l
         return None
     return conn.execute(
         """
-        SELECT id, lat, lon, timestamp, speed, altitude, horizontal_accuracy FROM points
+        SELECT id, lat, lon, timestamp, speed, altitude, horizontal_accuracy,
+               json_extract(raw_properties, '$.course') AS course, json_extract(raw_properties, '$.course_accuracy') AS course_accuracy
+        FROM points
         WHERE ride_id = ? AND owner_sub = ? ORDER BY timestamp
         """,
         (ride_id, owner_sub),

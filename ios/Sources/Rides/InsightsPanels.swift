@@ -26,7 +26,7 @@ struct InsightsFailedPanel: View {
 
     var body: some View {
         Panel(title: "Insights") {
-            Text("Couldn't load the weather, speed limits and elevation. \(message)").font(.footnote).foregroundStyle(Theme.muted)
+            Text("Couldn't load the weather, speed limits, lean and elevation. \(message)").font(.footnote).foregroundStyle(Theme.muted)
             Button("Try again", action: retry).buttonStyle(.bordered).font(.footnote)
         }
     }
@@ -214,6 +214,127 @@ struct SmoothnessPanel: View {
             }
             Text("Worked out from your GPS speed once a second, which misses the sharpest peaks: use it to compare your own rides, not as a measurement of g.")
                 .font(.caption2).foregroundStyle(Theme.muted)
+        }
+    }
+}
+
+struct DynamicsPanel: View {
+    let dynamics: DynamicsInfo
+    let cursorTime: Double
+    let select: (Double) -> Void
+    let jump: (Corner) -> Void
+    @State private var selectedMinutes: Double?
+
+    init(dynamics: DynamicsInfo, cursorTime: Double, select: @escaping (Double) -> Void, jump: @escaping (Corner) -> Void) {
+        self.dynamics = dynamics
+        self.cursorTime = cursorTime
+        self.select = select
+        self.jump = jump
+    }
+
+    var body: some View {
+        Panel(title: "Lean and G-force (estimated from GPS)") {
+            HStack {
+                StatTile(value: "\(dynamics.maxLeftDeg)", unit: "°", label: "Max left")
+                StatTile(value: "\(dynamics.maxRightDeg)", unit: "°", label: "Max right")
+                StatTile(value: "\(dynamics.cornerCount)", label: "Corners")
+            }
+            if dynamics.cornerCount == 0 {
+                Text("No corner leaned over more than 12° for long enough to count. Short, slow or gentle bends do not show.")
+                    .font(.footnote).foregroundStyle(Theme.muted)
+            }
+            if let here = InsightsLogic.dynamicsSample(at: cursorTime, in: dynamics.series) {
+                Label("Here: \(InsightsLogic.leanText(here.lean)), \(String(format: "%.2f", abs(here.latG))) g sideways, \(Int(here.kmh)) km/h",
+                      systemImage: "scope")
+                    .font(.footnote).foregroundStyle(Theme.accent)
+            }
+            leanChart
+            HStack {
+                StatTile(value: String(format: "%.2f", dynamics.maxBrakingG), unit: "g", label: "Hardest braking")
+                StatTile(value: String(format: "%.2f", dynamics.maxAccelG), unit: "g", label: "Hardest accel.")
+                StatTile(value: String(format: "%.2f", dynamics.maxLateralG), unit: "g", label: "Sideways")
+            }
+            forceChart
+            ForEach(InsightsLogic.topCorners(dynamics)) { corner in
+                Button { jump(corner) } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: corner.isRight ? "arrow.turn.up.right" : "arrow.turn.up.left").foregroundStyle(Theme.accent).frame(width: 24)
+                        Text(InsightsLogic.cornerText(corner)).font(.subheadline).foregroundStyle(Theme.text)
+                        Spacer()
+                        Text("\(corner.peakLean)°").font(Theme.readout(18)).foregroundStyle(Theme.text)
+                    }
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(corner.isRight ? "Right" : "Left") corner, \(corner.peakLean) degrees estimated lean, \(corner.apexKmh) kilometres per hour")
+            }
+            Text(InsightsLogic.dynamicsNote(dynamics)).font(.caption2).foregroundStyle(Theme.muted)
+        }
+    }
+
+    private var leanChart: some View {
+        let segments = InsightsLogic.segments(of: dynamics.series)
+        let limit = max(30, Double(max(dynamics.maxLeftDeg, dynamics.maxRightDeg)) + 8)
+        return VStack(alignment: .leading, spacing: 4) {
+            Chart {
+                ForEach(Array(dynamics.series.enumerated()), id: \.offset) { index, row in
+                    LineMark(x: .value("Minutes", row.t / 60), y: .value("Lean", row.lean), series: .value("Stretch", segments[index]))
+                        .foregroundStyle(Theme.accent)
+                }
+                RuleMark(y: .value("Upright", 0)).foregroundStyle(Theme.border)
+                RuleMark(x: .value("Now", cursorTime / 60)).foregroundStyle(Theme.text.opacity(0.8))
+            }
+            .chartYScale(domain: -limit...limit)
+            .chartXSelection(value: $selectedMinutes)
+            .chartXAxis {
+                AxisMarks { _ in
+                    AxisGridLine().foregroundStyle(Theme.border)
+                    AxisValueLabel().foregroundStyle(Theme.muted)
+                }
+            }
+            .chartYAxis {
+                AxisMarks { _ in
+                    AxisGridLine().foregroundStyle(Theme.border)
+                    AxisValueLabel().foregroundStyle(Theme.muted)
+                }
+            }
+            .chartXAxisLabel("minutes", alignment: .trailing)
+            .frame(height: 150)
+            .onChange(of: selectedMinutes) { _, minutes in
+                if let minutes { select(minutes * 60) }
+            }
+            Text("Up is leaning right, down is leaning left, in degrees.").font(.caption2).foregroundStyle(Theme.muted)
+        }
+    }
+
+    /// Sideways G against forward G, one dot per measured second: a tidy rider makes a plus sign, hard cornering while braking fills the corners.
+    private var forceChart: some View {
+        let limit = InsightsLogic.forceChartLimit(dynamics.series)
+        let here = InsightsLogic.dynamicsSample(at: cursorTime, in: dynamics.series)
+        return VStack(alignment: .leading, spacing: 4) {
+            Chart {
+                ForEach(Array(dynamics.series.enumerated()), id: \.offset) { _, row in
+                    PointMark(x: .value("Sideways", row.latG), y: .value("Forward", row.longG))
+                        .symbolSize(14)
+                        .foregroundStyle(Theme.accent.opacity(0.55))
+                }
+                if let here {
+                    PointMark(x: .value("Sideways", here.latG), y: .value("Forward", here.longG))
+                        .symbolSize(90)
+                        .foregroundStyle(Color.white)
+                }
+                RuleMark(x: .value("Zero", 0)).foregroundStyle(Theme.border)
+                RuleMark(y: .value("Zero", 0)).foregroundStyle(Theme.border)
+            }
+            .chartXScale(domain: -limit...limit)
+            .chartYScale(domain: -limit...limit)
+            .chartXAxisLabel("sideways g: left, right", alignment: .center)
+            .chartYAxisLabel("forward g: braking, accelerating", position: .leading)
+            .frame(maxWidth: 300)
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            Text("Each dot is one second of the ride; the white dot is the moment you are looking at.").font(.caption2).foregroundStyle(Theme.muted)
         }
     }
 }

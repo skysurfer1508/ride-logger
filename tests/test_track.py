@@ -1,4 +1,5 @@
 """app/track.py (stop detection, the full track) and GET /api/v1/rides/{id}/track."""
+import json
 import pytest
 
 from app import track
@@ -148,10 +149,11 @@ def insert_points(owner_sub: str, ride_id: int, rows: list[dict]) -> None:
     conn = get_db()
     try:
         for r in rows:
+            raw = {k: r[k] for k in ("course", "course_accuracy") if r.get(k) is not None}         # what the app's uploads carry beyond the columns
             conn.execute(
                 """INSERT INTO points (owner_sub, device_id, lat, lon, timestamp, speed, altitude, horizontal_accuracy, ride_id, raw_properties)
-                   VALUES (?, 'dev', ?, ?, ?, ?, ?, ?, ?, '{}')""",
-                (owner_sub, r["lat"], r["lon"], r["timestamp"], r["speed"], r["altitude"], r["horizontal_accuracy"], ride_id),
+                   VALUES (?, 'dev', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (owner_sub, r["lat"], r["lon"], r["timestamp"], r["speed"], r["altitude"], r["horizontal_accuracy"], ride_id, json.dumps(raw)),
             )
         conn.commit()
     finally:

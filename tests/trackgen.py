@@ -48,3 +48,52 @@ def make_rows(segments, step=2.0, jitter_m=0.0, accuracy=6.0, seed=1, unknown_sp
         else:
             raise ValueError((kind, how))
     return rows
+
+
+def make_path_rows(segments, speed, pos_sigma=0.0, course_sigma=None, seed=1, start=START) -> list[dict]:
+    """A ride that turns, for the lean and G-force tests. Starts heading north at a steady `speed` (m/s), one fix per second or so:
+
+        ("straight", metres)               ("turn", radius metres, degrees)    degrees > 0 turns right (clockwise), < 0 turns left
+
+    `pos_sigma` adds Gaussian GPS error in metres; `course_sigma` (degrees) adds the phone's heading in each row's "course" (None: no course, as in old rides).
+    """
+    import math
+    rnd = random.Random(seed)
+    x = y = heading = 0.0
+    t = 0.0
+    rows: list[dict] = []
+
+    def emit():
+        row = {
+            "id": len(rows) + 1,
+            "lat": LAT0 + (y + rnd.gauss(0, pos_sigma)) / M_PER_DEG_LAT,
+            "lon": LON0 + (x + rnd.gauss(0, pos_sigma)) / (M_PER_DEG_LAT * math.cos(math.radians(LAT0))),
+            "timestamp": (start + timedelta(seconds=t)).isoformat(),
+            "speed": float(speed),
+            "altitude": 410.0 + len(rows) * 0.01,
+            "horizontal_accuracy": 6.0,
+        }
+        if course_sigma is not None:
+            row["course"] = (math.degrees(heading) + rnd.gauss(0, course_sigma)) % 360
+            row["course_accuracy"] = max(1.0, course_sigma)
+        rows.append(row)
+
+    emit()
+    for seg in segments:
+        if seg[0] == "straight":
+            length, turn_rate = float(seg[1]), 0.0
+        elif seg[0] == "turn":
+            length = abs(math.radians(seg[2])) * seg[1]
+            turn_rate = math.radians(seg[2]) / length
+        else:
+            raise ValueError(seg)
+        steps = max(1, round(length / speed))
+        ds = length / steps
+        for _ in range(steps):
+            heading += turn_rate * ds / 2
+            x += ds * math.sin(heading)
+            y += ds * math.cos(heading)
+            heading += turn_rate * ds / 2
+            t += ds / speed
+            emit()
+    return rows

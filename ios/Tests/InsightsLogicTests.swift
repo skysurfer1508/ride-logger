@@ -142,4 +142,89 @@ final class InsightsLogicTests: XCTestCase {
         XCTAssertEqual(InsightsLogic.scoreWord(55), "Lively")
         XCTAssertEqual(InsightsLogic.scoreWord(10), "Hard")
     }
+
+    // MARK: lean and G-force
+
+    func testTheDynamicsDecodeFromTheGoldenAnswer() throws {
+        let dynamics = try XCTUnwrap(try fixture().dynamics)
+        XCTAssertTrue(dynamics.fromCourse)
+        XCTAssertEqual(dynamics.cornerCount, 1)
+        XCTAssertEqual(dynamics.maxRightDeg, 24)
+        XCTAssertEqual(dynamics.maxLeftDeg, 0)
+        let best = try XCTUnwrap(dynamics.bestCorner)
+        XCTAssertTrue(best.isRight)
+        XCTAssertEqual(best.peakLean, 24)
+        XCTAssertEqual(best.apexKmh, 90)
+        XCTAssertEqual(dynamics.corners, [best])
+        XCTAssertGreaterThan(dynamics.series.count, 50)
+        XCTAssertEqual(dynamics.series.first?.kmh, 90)
+        XCTAssertEqual(InsightsLogic.cornerText(best), "Right, 24° at 90 km/h, 183 m")
+        XCTAssertGreaterThan(dynamics.maxLateralG, 0.4)
+    }
+
+    func testARideWithoutDynamicsStillDecodes() throws {
+        let json = """
+        {"api":1,"ride_id":3,"elevation":null,"smoothness":null,"dynamics":null,"weather":{"status":"disabled"},"limits":{"status":"disabled"},"road_names":[]}
+        """
+        XCTAssertNil(try JSONDecoder.ridelog.decode(RideInsights.self, from: Data(json.utf8)).dynamics)
+    }
+
+    func testTheClosestChartRowIsFoundWithinReach() {
+        let series = [DynamicsSample(t: 1, lean: 5, latG: 0, longG: 0, kmh: 50), DynamicsSample(t: 2, lean: -8, latG: 0, longG: 0, kmh: 50),
+                      DynamicsSample(t: 10, lean: 20, latG: 0, longG: 0, kmh: 50)]
+        XCTAssertEqual(InsightsLogic.dynamicsSample(at: 1.4, in: series)?.lean, 5)
+        XCTAssertEqual(InsightsLogic.dynamicsSample(at: 1.6, in: series)?.lean, -8)
+        XCTAssertEqual(InsightsLogic.dynamicsSample(at: 9, in: series)?.lean, 20)
+        XCTAssertNil(InsightsLogic.dynamicsSample(at: 5.5, in: series))                 // more than 3 s from any row: the bike was too slow to measure there
+        XCTAssertEqual(InsightsLogic.dynamicsSample(at: 5.5, in: series, within: 5)?.lean, -8)             // 3.5 s from the row at 2 s, 4.5 s from the one at 10 s
+        XCTAssertNil(InsightsLogic.dynamicsSample(at: 0, in: []))
+        XCTAssertEqual(InsightsLogic.dynamicsSample(at: 100, in: series, within: 200)?.lean, 20)
+    }
+
+    func testLeanWords() {
+        XCTAssertEqual(InsightsLogic.leanText(12.4), "12° right")
+        XCTAssertEqual(InsightsLogic.leanText(-9.6), "10° left")
+        XCTAssertEqual(InsightsLogic.leanText(2.4), "upright")
+        XCTAssertEqual(InsightsLogic.leanText(-2.4), "upright")
+        XCTAssertEqual(InsightsLogic.leanText(0), "upright")
+    }
+
+    func testTheNoteSaysWhereTheHeadingCameFrom() throws {
+        let dynamics = try XCTUnwrap(try fixture().dynamics)
+        XCTAssertTrue(InsightsLogic.dynamicsNote(dynamics).contains("GPS heading"))
+        XCTAssertTrue(InsightsLogic.dynamicsNote(dynamics).contains("not as a measurement"))
+        let fromPositions = DynamicsInfo(source: "positions", maxLeftDeg: 0, maxRightDeg: 0, cornerCount: 0, bestCorner: nil, corners: [], maxBrakingG: 0, maxAccelG: 0,
+                                         maxLateralG: 0, series: [])
+        XCTAssertTrue(InsightsLogic.dynamicsNote(fromPositions).contains("less exact"))
+    }
+
+    func testTheTopCornersAreTheMostLeanedOverFirst() {
+        func corner(_ t: Double, _ lean: Int) -> Corner {
+            Corner(direction: "left", tStart: t, tEnd: t + 5, tApex: t + 2, peakLean: lean, peakG: 0.3, entryKmh: 50, apexKmh: 45, exitKmh: 50, lengthM: 60, distM: t * 10, lat: 47, lon: 8)
+        }
+        let dynamics = DynamicsInfo(source: "course", maxLeftDeg: 40, maxRightDeg: 0, cornerCount: 7, bestCorner: nil,
+                                    corners: [corner(1, 20), corner(2, 40), corner(3, 15), corner(4, 33), corner(5, 28), corner(6, 22), corner(7, 31)],
+                                    maxBrakingG: 0, maxAccelG: 0, maxLateralG: 0, series: [])
+        XCTAssertEqual(InsightsLogic.topCorners(dynamics).map(\.peakLean), [40, 33, 31, 28, 22])
+        XCTAssertEqual(InsightsLogic.topCorners(dynamics, limit: 2).map(\.peakLean), [40, 33])
+    }
+
+    func testTheLeanLineBreaksWhereTheBikeWasTooSlowToMeasure() {
+        func row(_ t: Double) -> DynamicsSample { DynamicsSample(t: t, lean: 0, latG: 0, longG: 0, kmh: 50) }
+        let series = [row(1), row(2), row(3), row(4), row(30), row(31), row(32), row(60)]
+        XCTAssertEqual(InsightsLogic.segments(of: series), [0, 0, 0, 0, 1, 1, 1, 2])
+        XCTAssertEqual(InsightsLogic.segments(of: [row(1), row(2)]), [0, 0])
+        XCTAssertEqual(InsightsLogic.segments(of: []), [])
+        // a long ride is thinned to every 18th second: that spacing is normal there, not a break
+        let thinned = [row(18), row(36), row(54), row(72), row(300), row(318)]
+        XCTAssertEqual(InsightsLogic.segments(of: thinned), [0, 0, 0, 0, 1, 1])
+    }
+
+    func testTheForceChartAlwaysFitsEveryPointAndNeverZoomsInTooFar() {
+        func rows(_ lat: Double, _ long: Double) -> [DynamicsSample] { [DynamicsSample(t: 1, lean: 0, latG: lat, longG: long, kmh: 50)] }
+        XCTAssertEqual(InsightsLogic.forceChartLimit(rows(0.1, 0.1)), 0.5)
+        XCTAssertEqual(InsightsLogic.forceChartLimit(rows(-0.62, 0.1)), 0.7, accuracy: 0.0001)
+        XCTAssertEqual(InsightsLogic.forceChartLimit(rows(0.1, -1.04)), 1.1, accuracy: 0.0001)
+        XCTAssertEqual(InsightsLogic.forceChartLimit([]), 0.5)
+    }
 }

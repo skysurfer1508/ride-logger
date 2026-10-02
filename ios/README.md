@@ -164,7 +164,7 @@ the new one. *Set odometer* corrects the reading at any time.
   is only as current as your last visit.
 - It is all stored on your server (your account only) and included nowhere else. Deleting a bike deletes its service, fuel and cost records; your rides stay.
 
-## Ride insights: weather, speed against the limit, elevation, smoothness
+## Ride insights: weather, speed against the limit, lean, elevation, smoothness
 
 Open a ride and scroll under the speed chart (needs the server restarted on this version, and Valhalla running for the limits, see below). The panels load after the
 map, so a slow service never delays the ride; each one says in words when its part is not available.
@@ -182,6 +182,14 @@ map, so a slow service never delays the ride; each one says in words when its pa
 - **Road names:** stops and the "At this point" card say which road you were on.
 - **Elevation:** altitude along the ride (smoothed), climbed and descended, highest point. Drag over the chart to move the dot on the map. The phone's GPS altitude is
   a few metres off; the figures are chosen so flat roads read as flat.
+- **Lean and G-force (estimated from GPS):** your lean angle in corners, the sideways and forward G, and your corners ranked by lean (tap one to jump there; the
+  steepest has a badge on the map). It is **worked out, not measured**: a bike at speed *v* turning at yaw rate *w* pulls sideways with *v x w* and leans until
+  tan(lean) = that / g. Heading comes from the phone's GPS course, which the app now sends with every fix (rides recorded before 1.10, and Overland rides, fall
+  back to the direction between GPS positions: less exact, and the shortest corners can be missed). Measured on synthetic rides with realistic GPS error: with
+  the course a corner is found every time and its lean is within about 3 degrees; from positions a tight 5-second corner is missed about one time in four and
+  reads about 3 degrees low; a straight road never produces a corner. The real lean differs from this: it ignores tyre profile and how far you hang off the bike,
+  assumes a steady corner, and GPS once a second cannot see a flick. Only spells over 12 degrees for 2 to 3 seconds count as corners, and nothing under 22 km/h
+  is analysed. Use it to compare corners and rides with each other, not as a number to trust to the degree.
 - **Smoothness:** hard braking and hard acceleration from the speed once a second, a 0 to 100 score, and markers on the map for hard braking. GPS at 1 Hz misses the
   sharpest peaks, so it is for comparing your own rides, not a measurement of g.
 
@@ -264,7 +272,10 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 2. Speed against the limit: are the stretches you remember going fast pink on the map, with the right limit in the list? Is a stretch listed where you were not over (or a 50 zone shown that was really 30)?
    Tell Claude the road and what the sign said. Settings > Ride insights off: the pink and the panel go away.
 3. Tap a stretch, a braking row, and the elevation chart: the dot and the map move there. Do the stops now show the road ("at 3.2 km · 14:03 · Hardstrasse")?
-4. Is the climbed metres figure close to what you expect for the route (compare with Komoot or the like)? Does a flat ride read as flat?
+4. Lean: after a ride with corners (it needs this version of the app on the phone, and a new ride), does the "Lean and G-force" panel show corners where you remember
+   them, left and right the right way round? Is the lean plausible (a brisk road corner is roughly 20 to 35 degrees; a parking-lot turn should show nothing)? Does the
+   chart go up for right and down for left? Old rides say "from your GPS positions" and read lower: that is expected. Tell Claude if the numbers look wrong.
+5. Is the climbed metres figure close to what you expect for the route (compare with Komoot or the like)? Does a flat ride read as flat?
 
 **Traffic tab**
 1. Open it: iOS asks to use your location; the map opens around you (or Zurich centre). Road colours show; pan and zoom, the chips and counts follow.

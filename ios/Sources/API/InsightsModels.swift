@@ -8,6 +8,8 @@ struct RideInsights: Decodable {
     let rideId: Int
     let elevation: ElevationProfile?
     let smoothness: Smoothness?
+    /// Lean angle and G-force, estimated from GPS. Nil for rides too short or too slow to say anything.
+    let dynamics: DynamicsInfo?
     let weather: WeatherInfo
     let limits: LimitsInfo
     /// The road the rider was on, each time it changed: [[seconds into the ride, name], ...].
@@ -138,4 +140,68 @@ struct LimitStretch: Decodable, Identifiable, Equatable {
     let distStartM: Double
 
     var id: Double { tStart }
+}
+
+/// Lean and G-force estimated from the GPS track (app/dynamics.py). Never a measurement: the screen says so next to every number.
+struct DynamicsInfo: Decodable {
+    /// "course" (the phone's own heading, more exact) or "positions" (worked out from where the bike was, for rides recorded before the app sent a course).
+    let source: String
+    let maxLeftDeg: Int
+    let maxRightDeg: Int
+    let cornerCount: Int
+    let bestCorner: Corner?
+    /// The most leaned-over corners first.
+    let corners: [Corner]
+    let maxBrakingG: Double
+    let maxAccelG: Double
+    let maxLateralG: Double
+    let series: [DynamicsSample]
+
+    var fromCourse: Bool { source == "course" }
+}
+
+struct Corner: Decodable, Identifiable, Equatable {
+    /// "left" or "right".
+    let direction: String
+    let tStart: Double
+    let tEnd: Double
+    let tApex: Double
+    let peakLean: Int
+    let peakG: Double
+    let entryKmh: Int
+    let apexKmh: Int
+    let exitKmh: Int
+    let lengthM: Int
+    let distM: Double
+    let lat: Double
+    let lon: Double
+
+    var id: Double { tStart }
+    var isRight: Bool { direction == "right" }
+}
+
+/// One row of the lean chart: [seconds into the ride, lean in degrees (right is positive), lateral G, forward G (braking is negative), km/h].
+struct DynamicsSample: Decodable, Equatable {
+    let t: Double
+    let lean: Double
+    let latG: Double
+    let longG: Double
+    let kmh: Double
+
+    init(t: Double, lean: Double, latG: Double, longG: Double, kmh: Double) {
+        self.t = t
+        self.lean = lean
+        self.latG = latG
+        self.longG = longG
+        self.kmh = kmh
+    }
+
+    init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        t = try c.decode(Double.self)
+        lean = try c.decode(Double.self)
+        latG = try c.decode(Double.self)
+        longG = try c.decode(Double.self)
+        kmh = try c.decode(Double.self)
+    }
 }

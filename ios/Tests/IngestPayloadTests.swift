@@ -18,7 +18,8 @@ final class IngestPayloadTests: XCTestCase {
                 horizontalAccuracy: try XCTUnwrap(s["horizontal_accuracy"] as? Double),
                 verticalAccuracy: try XCTUnwrap(s["vertical_accuracy"] as? Double),
                 batteryLevel: try XCTUnwrap(s["battery_level"] as? Double),
-                speedAccuracy: try XCTUnwrap(s["speed_accuracy"] as? Double))
+                speedAccuracy: try XCTUnwrap(s["speed_accuracy"] as? Double),
+                course: try XCTUnwrap(s["course"] as? Double), courseAccuracy: try XCTUnwrap(s["course_accuracy"] as? Double))
         }
     }
 
@@ -76,6 +77,19 @@ final class IngestPayloadTests: XCTestCase {
         XCTAssertEqual((known["properties"] as? [String: Any])?["speed_accuracy"] as? Double, 0.4)
         let unknown = IngestPayload.feature(for: makeSample(0), deviceId: "d", tripId: "t")
         XCTAssertNil((unknown["properties"] as? [String: Any])?["speed_accuracy"])
+    }
+
+    func testTheCourseIsUploadedOnlyWhenKnown() throws {
+        let known = IngestPayload.feature(for: makeSample(0, course: 123.4, courseAccuracy: 2.5), deviceId: "d", tripId: "t")
+        let p = try XCTUnwrap(known["properties"] as? [String: Any])
+        XCTAssertEqual(p["course"] as? Double, 123.4)
+        XCTAssertEqual(p["course_accuracy"] as? Double, 2.5)
+        let noAccuracy = IngestPayload.feature(for: makeSample(0, course: 90, courseAccuracy: -1), deviceId: "d", tripId: "t")
+        XCTAssertEqual((noAccuracy["properties"] as? [String: Any])?["course"] as? Double, 90)
+        XCTAssertNil((noAccuracy["properties"] as? [String: Any])?["course_accuracy"])
+        let unknown = IngestPayload.feature(for: makeSample(0), deviceId: "d", tripId: "t")
+        XCTAssertNil((unknown["properties"] as? [String: Any])?["course"])
+        XCTAssertNil((unknown["properties"] as? [String: Any])?["course_accuracy"])
     }
 
     func testAFixWithNonFiniteNumbersNeverReachesTheBody() throws {

@@ -19,9 +19,14 @@ struct LocationSample: Codable, Equatable {
     /// How far off `speed` may be, in m/s (CoreLocation's speedAccuracy). Negative when unknown, which is also what rides saved by an older
     /// version of the app have.
     var speedAccuracy: Double = -1
+    /// The direction of travel in degrees clockwise from north, from the GPS Doppler (CoreLocation's `course`): far more exact than one worked out from
+    /// positions, and what the server's lean-angle estimate prefers. Negative when unknown (also for rides saved by an older version of the app).
+    var course: Double = -1
+    /// How far off `course` may be, in degrees. Negative when unknown.
+    var courseAccuracy: Double = -1
 
     init(timestamp: Date, latitude: Double, longitude: Double, speed: Double, altitude: Double, horizontalAccuracy: Double,
-         verticalAccuracy: Double, batteryLevel: Double, speedAccuracy: Double = -1) {
+         verticalAccuracy: Double, batteryLevel: Double, speedAccuracy: Double = -1, course: Double = -1, courseAccuracy: Double = -1) {
         self.timestamp = timestamp
         self.latitude = latitude
         self.longitude = longitude
@@ -31,9 +36,11 @@ struct LocationSample: Codable, Equatable {
         self.verticalAccuracy = verticalAccuracy
         self.batteryLevel = batteryLevel
         self.speedAccuracy = speedAccuracy
+        self.course = course
+        self.courseAccuracy = courseAccuracy
     }
 
-    // Written by hand: the synthesized decoder demands every key, and a ride recorded before `speedAccuracy` existed (and still waiting on the
+    // Written by hand: the synthesized decoder demands every key, and a ride recorded before `speedAccuracy` or `course` existed (and still waiting on the
     // phone to upload) has none. Without this its fixes would all be skipped as unreadable.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -46,6 +53,8 @@ struct LocationSample: Codable, Equatable {
         verticalAccuracy = try c.decode(Double.self, forKey: .verticalAccuracy)
         batteryLevel = try c.decode(Double.self, forKey: .batteryLevel)
         speedAccuracy = try c.decodeIfPresent(Double.self, forKey: .speedAccuracy) ?? -1
+        course = try c.decodeIfPresent(Double.self, forKey: .course) ?? -1
+        courseAccuracy = try c.decodeIfPresent(Double.self, forKey: .courseAccuracy) ?? -1
     }
 }
 

@@ -78,6 +78,7 @@ def insert_point(conn: sqlite3.Connection, feature: LocationFeature, owner_sub: 
 
 
 def _rows_to_points(rows) -> list[dict]:
+    """Point rows as dicts. `course` / `course_accuracy` (degrees, from the app's GPS Doppler heading) are there only when the query asked for them."""
     return [
         {
             "id": r["id"],
@@ -87,6 +88,8 @@ def _rows_to_points(rows) -> list[dict]:
             "speed": r["speed"],
             "altitude": r["altitude"],
             "horizontal_accuracy": r["horizontal_accuracy"],
+            "course": r["course"] if "course" in r.keys() else None,
+            "course_accuracy": r["course_accuracy"] if "course_accuracy" in r.keys() else None,
         }
         for r in rows
     ]

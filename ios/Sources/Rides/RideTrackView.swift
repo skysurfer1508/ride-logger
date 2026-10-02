@@ -234,6 +234,18 @@ struct RideTrackContent: View {
                                 .accessibilityLabel(InsightsLogic.eventText(event))
                         }
                     }
+                    if let best = insights?.dynamics?.bestCorner {
+                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: best.lat, longitude: best.lon), anchor: .center) {
+                            Label("\(best.peakLean)°", systemImage: best.isRight ? "arrow.turn.up.right" : "arrow.turn.up.left")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(Theme.bg, in: Capsule())
+                                .overlay(Capsule().stroke(Theme.accent, lineWidth: 1.5))
+                                .foregroundStyle(Theme.text)
+                                .onTapGesture { model.select(time: best.tApex) }
+                                .accessibilityLabel("Most leaned-over corner, about \(best.peakLean) degrees, estimated")
+                        }
+                    }
                     if let top = track.maxSpeed {
                         Annotation("", coordinate: CLLocationCoordinate2D(latitude: top.lat, longitude: top.lon), anchor: .center) {
                             TopSpeedBadge(kmh: top.kmh).onTapGesture { model.select(time: top.t) }
@@ -327,6 +339,9 @@ struct RideTrackContent: View {
                 }
                 if let road = InsightsLogic.roadName(at: s.t, in: roadNames) {
                     Label(road, systemImage: "signpost.right.fill").font(.footnote).foregroundStyle(Theme.muted)
+                }
+                if let lean = InsightsLogic.dynamicsSample(at: s.t, in: insights?.dynamics?.series ?? [], within: 1.5), abs(lean.lean) >= 3 {
+                    Label("Leaning about \(InsightsLogic.leanText(lean.lean)) (estimated)", systemImage: "scope").font(.footnote).foregroundStyle(Theme.muted)
                 }
                 if let over = InsightsLogic.stretch(at: s.t, in: overStretches) {
                     Label("Over the limit here: up to +\(over.maxOverKmh) km/h in a \(over.limitKmh) zone", systemImage: "exclamationmark.triangle.fill")
@@ -444,6 +459,9 @@ struct RideTrackContent: View {
         case .loaded(let value):
             WeatherPanel(weather: value.weather)
             if showLimits { LimitsPanel(limits: value.limits) { stretch in jump(toTime: stretch.tStart) } }
+            if let dynamics = value.dynamics {
+                DynamicsPanel(dynamics: dynamics, cursorTime: model.cursor, select: { model.select(time: $0) }, jump: { jump(toTime: $0.tApex) })
+            }
             if let elevation = value.elevation {
                 ElevationPanel(profile: elevation, cursorMetres: model.sample?.dist ?? 0) { metres in
                     if let time = InsightsLogic.time(atDistance: metres, in: track.points) { model.select(time: time) }

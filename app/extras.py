@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from . import insights, limits, track, valhalla, weather
+from . import dynamics, insights, limits, track, valhalla, weather
 from .config import settings
 
 CACHE_VERSION = 1
@@ -82,10 +82,11 @@ def _road_names(points: Sequence[dict], matches: Sequence[Optional[dict]]) -> li
 def build(conn: sqlite3.Connection, ride_id: int, rows: Sequence) -> dict:
     points = track._prepare(rows)
     if len(points) < 2:
-        return {"elevation": None, "smoothness": None, "weather": {"status": "unavailable", "message": "Not enough data."},
+        return {"elevation": None, "smoothness": None, "dynamics": None, "weather": {"status": "unavailable", "message": "Not enough data."},
                 "limits": {"status": "no_data"}, "road_names": []}
     track._fill_speeds(points)
-    result = {"elevation": insights.elevation_profile(points), "smoothness": insights.smoothness(points), "weather": _weather(conn, ride_id, points)}
+    result = {"elevation": insights.elevation_profile(points), "smoothness": insights.smoothness(points), "dynamics": dynamics.analyze(points),
+              "weather": _weather(conn, ride_id, points)}
     status, matches = _matches(conn, ride_id, points)
     if matches is None:
         result["limits"] = {"status": status}

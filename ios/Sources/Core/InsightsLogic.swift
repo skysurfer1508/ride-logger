@@ -114,4 +114,66 @@ enum InsightsLogic {
         default: return "Hard"
         }
     }
+
+    // MARK: lean and G-force
+
+    /// The chart row closest to `time`, if one is within `within` seconds (the series skips slow and unmeasurable stretches).
+    static func dynamicsSample(at time: Double, in series: [DynamicsSample], within: Double = 3) -> DynamicsSample? {
+        guard !series.isEmpty else { return nil }
+        var lo = 0, hi = series.count - 1
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            if series[mid].t <= time { lo = mid } else { hi = mid - 1 }
+        }
+        let candidates = [series[lo], series[min(lo + 1, series.count - 1)]]
+        guard let best = candidates.min(by: { abs($0.t - time) < abs($1.t - time) }), abs(best.t - time) <= within else { return nil }
+        return best
+    }
+
+    /// "12° right", "9° left", "upright" under 3 degrees.
+    static func leanText(_ degrees: Double) -> String {
+        let rounded = Int(abs(degrees).rounded())
+        if rounded < 3 { return "upright" }
+        return "\(rounded)° " + (degrees > 0 ? "right" : "left")
+    }
+
+    /// "Right, 24° at 90 km/h, 183 m".
+    static func cornerText(_ corner: Corner) -> String {
+        "\(corner.isRight ? "Right" : "Left"), \(corner.peakLean)° at \(corner.apexKmh) km/h, \(corner.lengthM) m"
+    }
+
+    /// One honest sentence about where the heading came from.
+    static func dynamicsNote(_ dynamics: DynamicsInfo) -> String {
+        let how = dynamics.fromCourse
+            ? "Worked out from the phone's GPS heading and speed once a second."
+            : "Worked out from your GPS positions (this ride has no GPS heading), which is less exact: the shortest corners can be missed."
+        return how + " It assumes a steady corner and ignores tyres and how you sit on the bike, so the real lean differs, by a few degrees at best. Use it to compare corners and rides, not as a measurement."
+    }
+
+    /// The corners worth listing: the most leaned-over first, at most `limit`.
+    static func topCorners(_ dynamics: DynamicsInfo, limit: Int = 5) -> [Corner] {
+        Array(dynamics.corners.sorted { $0.peakLean > $1.peakLean }.prefix(limit))
+    }
+
+    /// A segment number for each chart row, so the lean line is drawn in pieces: a jump of more than three times the usual spacing between rows (and at
+    /// least 3 s) is a stretch where the bike was too slow to measure, and a line across it would claim a lean there.
+    static func segments(of series: [DynamicsSample]) -> [Int] {
+        guard series.count > 1 else { return Array(repeating: 0, count: series.count) }
+        let gaps = zip(series.dropFirst(), series).map { $0.t - $1.t }
+        let usual = gaps.sorted()[gaps.count / 2]
+        let limit = max(3, 3 * usual)
+        var segment = 0
+        var out = [0]
+        for gap in gaps {
+            if gap > limit { segment += 1 }
+            out.append(segment)
+        }
+        return out
+    }
+
+    /// Half the width of the force chart, in g: the biggest force plus a margin, in steps of 0.1, and never under 0.5 so a gentle ride does not look violent.
+    static func forceChartLimit(_ series: [DynamicsSample]) -> Double {
+        let biggest = series.map { max(abs($0.latG), abs($0.longG)) }.max() ?? 0
+        return max(0.5, ((biggest + 0.05) * 10).rounded(.up) / 10)
+    }
 }

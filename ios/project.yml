@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.9"
-    CURRENT_PROJECT_VERSION: "10"
+    MARKETING_VERSION: "1.10"
+    CURRENT_PROJECT_VERSION: "11"
 targets:
   RideLog:
     type: application
