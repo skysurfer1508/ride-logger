@@ -1,17 +1,16 @@
 import Charts
 import SwiftUI
 
-struct OverviewView: View {
+/// Totals, weekly distance, records and the 90-day heatmap. Pushed from Home (so it uses Home's navigation stack, which also opens a record's ride).
+struct OverviewScreen: View {
     let api: APIClient
 
     var body: some View {
-        NavigationStack {
-            LoaderScreen(api: api, path: "overview") { (overview: OverviewResponse) in
-                OverviewContent(overview: overview)
-            }
-            .navigationTitle("Overview")
-            .navigationDestination(for: RideSummary.self) { RideDetailView(api: api, ride: $0) }
+        LoaderScreen(api: api, path: "overview") { (overview: OverviewResponse) in
+            OverviewContent(overview: overview)
         }
+        .navigationTitle("Overview")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -9,7 +9,7 @@ extension Notification.Name {
 
 /// The tabs, in order.
 enum AppTab: Int, CaseIterable, Identifiable {
-    case home, rides, record, overview, settings
+    case home, rides, record, traffic, settings
 
     var id: Int { rawValue }
     var title: String {
@@ -17,7 +17,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .home: return "Home"
         case .rides: return "Rides"
         case .record: return "Record"
-        case .overview: return "Overview"
+        case .traffic: return "Traffic"
         case .settings: return "Settings"
         }
     }
@@ -27,7 +27,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
         case .home: return "gauge.with.dots.needle.bottom.50percent"
         case .rides: return "list.bullet"
         case .record: return "record.circle"
-        case .overview: return "chart.bar.xaxis"
+        case .traffic: return "car.fill"
         case .settings: return "slider.horizontal.3"
         }
     }

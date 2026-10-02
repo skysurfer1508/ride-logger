@@ -114,6 +114,43 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertNil(track.featuresStatus)
     }
 
+    func testTrafficConfig() throws {
+        let config: TrafficConfig = try load("api_traffic_config")
+        XCTAssertEqual(config, TrafficConfig(incidents: true, webcams: true))
+    }
+
+    func testTrafficIncidents() throws {
+        let result: IncidentsResponse = try load("api_traffic_incidents")
+        XCTAssertEqual(result.incidents.count, 3)
+        XCTAssertEqual(result.unlocated, 1)
+        XCTAssertEqual(result.total, 4)
+        XCTAssertEqual(result.incidents.map(\.distanceKm), result.incidents.map(\.distanceKm).sorted())      // nearest first
+        let accident = try XCTUnwrap(result.incidents.first { $0.id == "S1-R1" })
+        XCTAssertEqual(accident.incidentKind, .accident)
+        XCTAssertEqual(accident.severity, "high")
+        XCTAssertEqual(accident.road, "A1")
+        XCTAssertTrue(accident.comment.hasPrefix("Unfall auf der A1"))
+        XCTAssertEqual(accident.end, "2026-10-02T10:00:00Z")
+        let bare = try XCTUnwrap(result.incidents.first { $0.id == "S5-R1" })
+        XCTAssertNil(bare.severity)
+        XCTAssertNil(bare.road)
+        XCTAssertNil(bare.start)
+        XCTAssertEqual(bare.comment, "")
+        XCTAssertEqual(bare.incidentKind, .other)
+    }
+
+    func testTrafficWebcams() throws {
+        let result: WebcamsResponse = try load("api_traffic_webcams")
+        XCTAssertEqual(result.webcams.map(\.id), ["111", "222"])
+        let first = result.webcams[0]
+        XCTAssertEqual(first.title, "Hardbrucke")
+        XCTAssertEqual(first.preview, "https://img.example/111.jpg")
+        XCTAssertEqual(first.detailUrl, "https://windy.example/111")
+        XCTAssertEqual(first.playerUrl, "https://player.example/111")
+        XCTAssertNil(result.webcams[1].preview)
+        XCTAssertNil(result.webcams[1].detailUrl)
+    }
+
     func testDeleteResponse() throws {
         let json = #"{"api":1,"deleted":42}"#
         XCTAssertEqual(try JSONDecoder.ridelog.decode(DeleteResponse.self, from: Data(json.utf8)).deleted, 42)

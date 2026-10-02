@@ -5,9 +5,12 @@ enum APIError: LocalizedError {
     case server(Int)
     case offline
     case decoding(String)
+    /// A readable reason the server itself gave (a traffic source that is down), shown as it is.
+    case message(String)
 
     var errorDescription: String? {
         switch self {
+        case .message(let text): return text
         case .unauthorized: return "You've been signed out."
         case .server(let code) where code == 404 || code == 405:
             return "The server doesn't know this request (\(code)). If the app was just updated, the server needs the update and a restart too."
@@ -84,7 +87,19 @@ final class APIClient: ObservableObject {
             await MainActor.run { onUnauthorized?() }
             throw APIError.unauthorized
         }
-        guard (200..<300).contains(status) else { throw APIError.server(status) }
+        guard (200..<300).contains(status) else {
+            if status == 502, let text = Self.serviceMessage(in: data) { throw APIError.message(text) }
+            throw APIError.server(status)
+        }
         return data
+    }
+
+    /// `{"detail": {"detail": "traffic_unavailable", "message": "..."}}` from the traffic endpoints.
+    static func serviceMessage(in data: Data) -> String? {
+        struct Body: Decodable {
+            struct Detail: Decodable { let message: String? }
+            let detail: Detail?
+        }
+        return (try? JSONDecoder().decode(Body.self, from: data))?.detail?.message
     }
 }

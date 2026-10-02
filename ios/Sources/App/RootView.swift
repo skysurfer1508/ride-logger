@@ -59,9 +59,9 @@ struct MainTabs: View {
             RecordView(recorder: recorder, uploader: recorder.uploader)
                 .tabItem { Label(AppTab.record.title, systemImage: AppTab.record.symbol) }
                 .tag(AppTab.record)
-            OverviewView(api: api)
-                .tabItem { Label(AppTab.overview.title, systemImage: AppTab.overview.symbol) }
-                .tag(AppTab.overview)
+            TrafficView(api: api)
+                .tabItem { Label(AppTab.traffic.title, systemImage: AppTab.traffic.symbol) }
+                .tag(AppTab.traffic)
             SettingsView(api: api, auth: auth, recorder: recorder, uploader: recorder.uploader)
                 .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.symbol) }
                 .tag(AppTab.settings)

@@ -71,6 +71,31 @@ and a queue that passes a signal you did not wait for can be mislabelled, so tre
 contributors, shown under the stops. Server settings: `OSM_ENABLED`, `OSM_USER_AGENT` (put a contact email in it, the public servers ask for that),
 `OVERPASS_URLS` (see `.env.example`).
 
+## Traffic tab: is the road clear?
+
+A map of your surroundings with three layers you can switch on and off (the chips at the top):
+
+- **Traffic** (always available): Apple Maps' live road colours (green flowing, orange slow, red jammed). It is MapKit's built-in layer, so it needs no key,
+  no account and no server setup; Apple lists traffic as available in Switzerland.
+- **Incidents** (needs a free key): accidents, congestion, roadworks and closures from the official Swiss traffic situations feed (ASTRA,
+  opentransportdata.swiss). Tap a pin for the description and how long it lasts. Mostly the national roads; some reports have no map position, and the
+  count of those is shown.
+- **Webcams** (needs a free key): public webcams near the map from the Windy Webcams API, as a snapshot with a link to the live view. Windy's free service
+  only allows linking to its own player and its picture links expire after 15 minutes, so a picture is a snapshot and may be several minutes old. There are
+  few real *traffic* cameras: ASTRA switched its public Zurich motorway cameras off in 2020 (data protection), so what exists is mostly city and scenic cams.
+
+A layer without a key shows a padlock; tapping it says what to add. Keys live **on your server only** (never in the app):
+
+1. Incidents: register at <https://api-manager.opentransportdata.swiss>, subscribe to *Traffic situations*, copy the key into `.env` as `OPENTRANSPORTDATA_API_KEY=...`.
+2. Webcams: get a key at <https://api.windy.com/keys>, put it in `.env` as `WINDY_API_KEY=...`.
+3. `sudo systemctl restart ride-logger`, then check both sources once with `cd ~/ride-logger && .venv/bin/python -m app.cli check-traffic`.
+
+**Not yet proven against the live services:** the author had no keys, so the incident and webcam code was only tested against fake answers (the DATEX II sample
+is hand-written). `check-traffic` prints what each service really returned, with the start of the raw answer if nothing could be read: if it says "nothing
+could be read", send that output to Claude Code and the parser gets fixed.
+
+Overview (totals, records, weekly chart) moved from its own tab to a row on the Home screen to keep the tab bar at five.
+
 ## Deleting rides
 
 Rides > swipe a ride to the left > **Delete**, or open a ride and tap the trash icon. Both ask first. Deleting removes the ride **and its GPS points** from
@@ -119,6 +144,13 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
 6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
 
+**Traffic tab**
+1. Open it: iOS asks to use your location; the map opens around you (or Zurich centre). Road colours show; pan and zoom, the chips and counts follow.
+2. Without keys: Incidents and Webcams show a padlock, tapping explains what to add. With keys (see above): pins appear; tap one for its sheet.
+3. Is an incident you can see out of the window really on the map? Does a webcam picture load, and "Open the live view" open Windy?
+4. Switch layers off and on; refresh button; airplane mode shows a readable message instead of a crash.
+5. Home > "Totals, records and weekly distance" opens the overview; tapping a record opens that ride.
+
 **Deleting**
 1. Rides: swipe a ride left, tap Delete, confirm. It disappears, and Home and Overview totals drop by that ride (the website too).
 2. Open a ride, tap the trash icon, confirm: you land back on the list without it.
@@ -127,5 +159,5 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 ## Not in the app (yet)
 
 Automatic start and stop, a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
-traffic cameras. Next rounds, once
+real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.
