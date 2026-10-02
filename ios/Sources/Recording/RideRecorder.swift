@@ -37,6 +37,10 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published private(set) var interruptedCanResume = false
     @Published private(set) var summary: Summary?
     @Published var errorMessage: String?
+    /// True when the ride was started without a button press (Shortcuts, motion, notification, Watch): only such a ride is ended automatically when parked.
+    @Published private(set) var startedAutomatically = false
+    /// Called for every fix that was kept (the auto-start coordinator watches it).
+    var onFix: ((LocationSample) -> Void)?
 
     let uploader: RideUploader
     private let store: TripStore
@@ -69,6 +73,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
     // MARK: state the screen reads
 
     var isAuthorized: Bool { authorization == .authorizedWhenInUse || authorization == .authorizedAlways }
+    var isAlways: Bool { authorization == .authorizedAlways }
     var isDenied: Bool { authorization == .denied || authorization == .restricted }
     var isRecording: Bool { phase == .recording }
     var canStart: Bool { phase == .idle && isAuthorized && uploader.credentials != nil && interrupted == nil }
@@ -92,6 +97,9 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
 
     func requestPermission() { manager.requestWhenInUseAuthorization() }
 
+    /// The second step: "Always" lets the phone notice that you started riding while the app is closed. iOS asks only after "While Using" was given.
+    func requestAlwaysPermission() { manager.requestAlwaysAuthorization() }
+
     func requestPreciseLocation() {
         manager.requestTemporaryFullAccuracyAuthorization(withPurposeKey: "RecordRide")
     }
@@ -103,8 +111,9 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
 
     // MARK: start / stop
 
-    func start() {
+    func start(automatic: Bool = false) {
         guard canStart, let creds = uploader.credentials else { return }
+        startedAutomatically = automatic
         summary = nil
         errorMessage = nil
         let now = Self.wholeSecond(Date())
@@ -168,6 +177,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
             return
         }
         store.repairTail(tripId: record.tripId)
+        startedAutomatically = false
         let samples = store.samples(tripId: record.tripId)
         trip = record
         stats = LiveStats.from(samples)
@@ -293,6 +303,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
             }
             stats.add(sample)
             latest = sample
+            onFix?(sample)
             route.append(location.coordinate)
         }
     }

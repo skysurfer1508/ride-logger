@@ -6,6 +6,7 @@ struct SettingsView: View {
     @ObservedObject var auth: AuthService
     @ObservedObject var recorder: RideRecorder
     @ObservedObject var uploader: RideUploader
+    @ObservedObject var autoStart: AutoStartCoordinator
     @AppStorage("keepScreenOn") private var keepScreenOn = true
     @State private var localRides: [RideRecorder.LocalRide] = []
     @State private var deleteTarget: RideRecorder.LocalRide?
@@ -29,11 +30,12 @@ struct SettingsView: View {
         let isError: Bool
     }
 
-    init(api: APIClient, auth: AuthService, recorder: RideRecorder, uploader: RideUploader) {
+    init(api: APIClient, auth: AuthService, recorder: RideRecorder, uploader: RideUploader, autoStart: AutoStartCoordinator) {
         self.api = api
         self.auth = auth
         self.recorder = recorder
         self.uploader = uploader
+        self.autoStart = autoStart
         _me = StateObject(wrappedValue: Loader(api: api, path: "me"))
         _server = StateObject(wrappedValue: Loader(api: api, path: "settings"))
     }
@@ -52,6 +54,7 @@ struct SettingsView: View {
                     }
                     accountPanel
                     recordingPanel
+                    AutoStartPanel(coordinator: autoStart, recorder: recorder)
                     dataPanel
                     overlandPanel
                     detectionPanel

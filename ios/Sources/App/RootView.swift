@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct RideLogApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -45,7 +47,7 @@ struct MainTabs: View {
     init(api: APIClient, auth: AuthService) {
         self.api = api
         self.auth = auth
-        _recorder = StateObject(wrappedValue: RideRecorder(api: api))
+        _recorder = StateObject(wrappedValue: AppServices.shared.recorder)       // the same one a Shortcuts intent uses, so a ride keeps going whichever way it started
     }
 
     var body: some View {
@@ -62,7 +64,7 @@ struct MainTabs: View {
             TrafficView(api: api)
                 .tabItem { Label(AppTab.traffic.title, systemImage: AppTab.traffic.symbol) }
                 .tag(AppTab.traffic)
-            SettingsView(api: api, auth: auth, recorder: recorder, uploader: recorder.uploader)
+            SettingsView(api: api, auth: auth, recorder: recorder, uploader: recorder.uploader, autoStart: AppServices.shared.autoStart)
                 .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.symbol) }
                 .tag(AppTab.settings)
         }

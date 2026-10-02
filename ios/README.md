@@ -116,6 +116,37 @@ The feed's limits are 5 calls per minute; the server fetches it at most once eve
 
 Overview (totals, records, weekly chart) moved from its own tab to a row on the Home screen to keep the tab bar at five.
 
+## Hands-free start (helmet Bluetooth, Siri, Action button)
+
+**What iOS allows.** An app cannot be launched because a classic Bluetooth device (a helmet intercom) connected, and Core Bluetooth cannot see such
+connections. What iOS does offer is **Shortcuts automations**: *When [helmet] is connected, run an action.* RideLog provides the actions *Start ride*
+and *Stop ride* (they also work with Siri: "Start a ride in RideLog", and on the Action button via *Settings > Action Button > Shortcut*).
+
+**Set it up (once).**
+1. RideLog > Settings > Auto-start: tap *Allow notifications* (the safety net, see below). Make sure location is allowed.
+2. Pair the helmet with the phone as usual. Then Shortcuts > Automation > + > **Bluetooth** > choose your helmet > **Is Connected** > *Run Immediately* >
+   Next > *Add Action* > RideLog > **Start ride** > Done. Optionally a second automation with **Is Disconnected** and **Stop ride**.
+3. iOS 18.2 had a bug where "Run Immediately" asked for confirmation anyway; if yours does, update iOS or accept the prompt.
+
+**What happens, and the part nobody can promise.** The automation runs *Start ride* even with the phone locked. RideLog starts recording and, at the same
+moment, schedules a notification for 25 seconds later ("Recording did not start by itself. Tap to start."). The first GPS fix cancels it. iOS may stop a
+location session that was started inside a shortcut when the shortcut ends: if that happens no fix arrives, the notification shows up on the locked
+screen, and one tap starts the ride. Whether the silent start works on your phone is **only known by trying**: the diary in Settings > Auto-start records
+every attempt (time, trigger, what happened, the audio devices iOS reported) so a failure can be fixed instead of guessed at.
+
+**Start by itself without the Shortcuts automation (optional).** Settings > Auto-start > *Notice when I start riding* (needs location set to **Always**). iOS wakes
+RideLog on a significant movement, the motion sensor must say "vehicle" (or be unavailable), the GPS is watched for at most two minutes, and a ride at
+15 km/h or more for 20 seconds is started, or offered in a notification, as you choose. With *Only when my helmet is connected* on, a tram or a car does not
+start a ride; this depends on iOS reporting your helmet as an audio device, which a classic Bluetooth helmet often does only while audio plays to it (the
+*Look for connected audio devices* button shows what iOS reports; if your helmet never appears, switch the option off).
+A ride that started by itself ends by itself after 10 minutes without moving; you get a notification.
+
+**Test protocol for your next ride** (please report the diary, not just "it worked"):
+1. Phone locked in the bag, helmet off. Switch the helmet on: wait 30 s. Open Settings > Auto-start > What happened: is there a *started* and a *first location fix* line?
+   If instead a notification arrived, tell me; the entry shows what iOS did.
+2. Ride a few minutes, stop, park for 10+ minutes: did the ride end by itself?
+3. Optionally turn the helmet off and ride to test the motion fallback (needs Always).
+
 ## GPX export and import
 
 - **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple
