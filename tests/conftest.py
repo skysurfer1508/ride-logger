@@ -40,6 +40,18 @@ def session_cookie(user: dict, **extra) -> str:
 
 
 @pytest.fixture(autouse=True)
+def no_downloads(monkeypatch):
+    """The Swiss TMC location tables are downloaded on first use: never from a test (the TMC tests fake the download themselves)."""
+    from app import tmc
+    def refuse(version):
+        raise RuntimeError("no network in tests")
+    monkeypatch.setattr(tmc, "_download", refuse)
+    tmc.forget()
+    yield
+    tmc.forget()
+
+
+@pytest.fixture(autouse=True)
 def fresh_db():
     path = Path(settings.db_path)
     for suffix in ("", "-journal", "-wal", "-shm"):

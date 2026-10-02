@@ -54,6 +54,18 @@ final class TrafficLogicTests: XCTestCase {
 
     // MARK: words
 
+    private func incident(_ id: String, _ kind: String) -> TrafficIncident {
+        let json = #"{"id":"\#(id)","kind":"\#(kind)","title":"t","severity":null,"comment":"","road":null,"start":null,"end":null,"lat":47.0,"lon":8.0,"distance_km":1.0}"#
+        return try! JSONDecoder.ridelog.decode(TrafficIncident.self, from: Data(json.utf8))
+    }
+
+    func testWorksAreHiddenUnlessAskedFor() {
+        let all = ["a": "accident", "c": "congestion", "h": "hazard", "o": "other", "r": "roadworks", "x": "closure"].map { incident($0.key, $0.value) }
+        XCTAssertEqual(Set(TrafficLogic.visibleIncidents(all, showWorks: false).map(\.id)), ["a", "c", "h", "o"])
+        XCTAssertEqual(TrafficLogic.visibleIncidents(all, showWorks: true).count, 6)
+        XCTAssertTrue(TrafficLogic.visibleIncidents([], showWorks: false).isEmpty)
+    }
+
     func testDistanceText() {
         XCTAssertEqual(TrafficLogic.distanceText(0.94), "0.9 km")
         XCTAssertEqual(TrafficLogic.distanceText(12.4), "12 km")

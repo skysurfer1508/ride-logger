@@ -121,22 +121,27 @@ final class ModelDecodingTests: XCTestCase {
 
     func testTrafficIncidents() throws {
         let result: IncidentsResponse = try load("api_traffic_incidents")
-        XCTAssertEqual(result.incidents.count, 3)
+        XCTAssertEqual(result.incidents.count, 4)
         XCTAssertEqual(result.unlocated, 1)
-        XCTAssertEqual(result.total, 4)
+        XCTAssertEqual(result.total, 5)
         XCTAssertEqual(result.incidents.map(\.distanceKm), result.incidents.map(\.distanceKm).sorted())      // nearest first
         let accident = try XCTUnwrap(result.incidents.first { $0.id == "S1-R1" })
         XCTAssertEqual(accident.incidentKind, .accident)
         XCTAssertEqual(accident.severity, "high")
-        XCTAssertEqual(accident.road, "A1")
-        XCTAssertTrue(accident.comment.hasPrefix("Unfall auf der A1"))
+        XCTAssertEqual(accident.comment, "Accident on the A1, right lane closed.")
         XCTAssertEqual(accident.end, "2026-10-02T10:00:00Z")
+        let jam = try XCTUnwrap(result.incidents.first { $0.id == "S2-R1" })
+        XCTAssertEqual(jam.incidentKind, .congestion)
+        XCTAssertEqual(jam.title, "Queuing traffic")
+        XCTAssertNil(jam.severity)
+        XCTAssertNil(jam.end)
+        XCTAssertEqual(jam.comment, "")
+        let closure = try XCTUnwrap(result.incidents.first { $0.id == "S11-R1" })
+        XCTAssertEqual(closure.incidentKind, .closure)
+        XCTAssertEqual(closure.title, "Road closed")
         let bare = try XCTUnwrap(result.incidents.first { $0.id == "S5-R1" })
-        XCTAssertNil(bare.severity)
-        XCTAssertNil(bare.road)
-        XCTAssertNil(bare.start)
-        XCTAssertEqual(bare.comment, "")
         XCTAssertEqual(bare.incidentKind, .other)
+        XCTAssertNil(bare.road)
     }
 
     func testTrafficWebcams() throws {

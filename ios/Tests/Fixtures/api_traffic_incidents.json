@@ -16,31 +16,44 @@
   },
   {
    "comment": "",
-   "distance_km": 3.0,
+   "distance_km": 2.5,
    "end": null,
    "id": "S2-R1",
    "kind": "congestion",
-   "lat": 47.3601,
-   "lon": 8.5101,
+   "lat": 47.37,
+   "lon": 8.51,
    "road": null,
-   "severity": "medium",
-   "start": null,
-   "title": "Congestion"
+   "severity": null,
+   "start": "2026-10-02T07:00:00Z",
+   "title": "Queuing traffic"
   },
   {
-   "comment": "Unfall auf der A1, rechter Fahrstreifen gesperrt.",
+   "comment": "Accident on the A1, right lane closed.",
    "distance_km": 4.5,
    "end": "2026-10-02T10:00:00Z",
    "id": "S1-R1",
    "kind": "accident",
    "lat": 47.4123,
    "lon": 8.5712,
-   "road": "A1",
+   "road": null,
    "severity": "high",
    "start": "2026-10-02T08:10:00Z",
    "title": "Accident"
+  },
+  {
+   "comment": "",
+   "distance_km": 9.2,
+   "end": null,
+   "id": "S11-R1",
+   "kind": "closure",
+   "lat": 47.45,
+   "lon": 8.6,
+   "road": null,
+   "severity": null,
+   "start": null,
+   "title": "Road closed"
   }
  ],
- "total": 4,
+ "total": 5,
  "unlocated": 1
 }

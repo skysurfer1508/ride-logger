@@ -77,9 +77,12 @@ A map of your surroundings with three layers you can switch on and off (the chip
 
 - **Traffic** (always available): Apple Maps' live road colours (green flowing, orange slow, red jammed). It is MapKit's built-in layer, so it needs no key,
   no account and no server setup; Apple lists traffic as available in Switzerland.
-- **Incidents** (needs a free key): accidents, congestion, roadworks and closures from the official Swiss traffic situations feed (ASTRA,
-  opentransportdata.swiss). Tap a pin for the description and how long it lasts. Mostly the national roads; some reports have no map position, and the
-  count of those is shown.
+- **Incidents** (needs a free key): jams, accidents and hazards from the official Swiss traffic situations feed (ASTRA, opentransportdata.swiss). The feed
+  holds about 3,000 records, mostly long-running roadworks and lane closures, plus "released" notices for things that already ended. By default the map shows
+  only **jams, accidents and hazards** that are valid right now (there can well be none: on the day this was built, 2 jams and 2 accidents in all of
+  Switzerland); the **Works** chip adds roadworks and closures (about 1,700, titled from the feed: "Road closed", "Narrow lanes", ...). Tap a pin for the
+  description and how long it lasts. Most records come with only AlertC location codes, which the server turns into map positions with Switzerland's TMC
+  location tables (three small open-data files, downloaded once into the data folder on first use, about 4 MB, never committed to git).
 - **Webcams** (needs a free key): public webcams near the map from the Windy Webcams API, as a snapshot with a link to the live view. Windy's free service
   only allows linking to its own player and its picture links expire after 15 minutes, so a picture is a snapshot and may be several minutes old. There are
   few real *traffic* cameras: ASTRA switched its public Zurich motorway cameras off in 2020 (data protection), so what exists is mostly city and scenic cams.
@@ -90,9 +93,12 @@ A layer without a key shows a padlock; tapping it says what to add. Keys live **
 2. Webcams: get a key at <https://api.windy.com/keys>, put it in `.env` as `WINDY_API_KEY=...`.
 3. `sudo systemctl restart ride-logger`, then check both sources once with `cd ~/ride-logger && .venv/bin/python -m app.cli check-traffic`.
 
-**Not yet proven against the live services:** the author had no keys, so the incident and webcam code was only tested against fake answers (the DATEX II sample
-is hand-written). `check-traffic` prints what each service really returned, with the start of the raw answer if nothing could be read: if it says "nothing
-could be read", send that output to Claude Code and the parser gets fixed.
+**What has and has not been checked against the live services.** Incidents: the request format was found by trying it with a real key and the parser was
+built and run against a real capture of the feed (3,157 records, 0.6 s to read, every code that was needed resolved to a position). What is still unverified
+is the app side on a phone, and webcams: nobody had a Windy key, so that code only ran against fake answers. `python -m app.cli check-traffic` calls each
+source once and prints what came back (with the raw start of the answer if nothing could be read): if a layer fails, send that output to Claude Code.
+
+The feed's limits are 5 calls per minute; the server fetches it at most once every 5 minutes and shares the answer with everyone.
 
 Overview (totals, records, weekly chart) moved from its own tab to a row on the Home screen to keep the tab bar at five.
 
@@ -146,7 +152,7 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 **Traffic tab**
 1. Open it: iOS asks to use your location; the map opens around you (or Zurich centre). Road colours show; pan and zoom, the chips and counts follow.
-2. Without keys: Incidents and Webcams show a padlock, tapping explains what to add. With keys (see above): pins appear; tap one for its sheet.
+2. Without keys: Incidents and Webcams show a padlock, tapping explains what to add. With keys (see above): pins appear; tap one for its sheet. Tap **Works** to add roadworks and closures (many pins), and tap again to hide them.
 3. Is an incident you can see out of the window really on the map? Does a webcam picture load, and "Open the live view" open Windy?
 4. Switch layers off and on; refresh button; airplane mode shows a readable message instead of a crash.
 5. Home > "Totals, records and weekly distance" opens the overview; tapping a record opens that ride.

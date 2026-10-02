@@ -32,6 +32,12 @@ enum TrafficLogic {
         return ratio > 1.4 || ratio < 0.6
     }
 
+    /// The feed lists about 1,700 long-running roadworks and lane closures next to a handful of jams, accidents and hazards. The map shows the
+    /// second group by default and the works only when asked.
+    static func visibleIncidents(_ incidents: [TrafficIncident], showWorks: Bool) -> [TrafficIncident] {
+        showWorks ? incidents : incidents.filter { $0.incidentKind != .roadworks && $0.incidentKind != .closure }
+    }
+
     /// "0.9 km" below 10 km, "12 km" above.
     static func distanceText(_ km: Double) -> String {
         km < 10 ? String(format: "%.1f km", km) : String(format: "%.0f km", km)

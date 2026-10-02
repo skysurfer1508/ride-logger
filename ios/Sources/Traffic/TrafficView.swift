@@ -96,6 +96,7 @@ struct TrafficView: View {
     @AppStorage("traffic.colours") private var showColours = true
     @AppStorage("traffic.incidents") private var showIncidents = true
     @AppStorage("traffic.webcams") private var showWebcams = true
+    @AppStorage("traffic.works") private var showWorks = false
     @State private var camera: MapCameraPosition = .userLocation(fallback: .region(
         MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 47.3769, longitude: 8.5417), span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12))))
     @State private var visible: MKCoordinateRegion?
@@ -150,7 +151,7 @@ struct TrafficView: View {
         Map(position: $camera) {
             UserAnnotation()
             if showIncidents {
-                ForEach(model.incidents) { incident in
+                ForEach(shownIncidents) { incident in
                     Annotation("", coordinate: CLLocationCoordinate2D(latitude: incident.lat, longitude: incident.lon), anchor: .center) {
                         IncidentPin(kind: incident.incidentKind).onTapGesture { selectedIncident = incident }
                     }
@@ -182,6 +183,9 @@ struct TrafficView: View {
         HStack(spacing: 8) {
             chip("Traffic", systemImage: "car.fill", isOn: $showColours, available: true, layer: "colours")
             chip("Incidents", systemImage: "exclamationmark.triangle.fill", isOn: $showIncidents, available: model.config?.incidents ?? false, layer: "incidents")
+            if showIncidents, model.config?.incidents == true {
+                chip("Works", systemImage: "hammer.fill", isOn: $showWorks, available: true, layer: "works")
+            }
             chip("Webcams", systemImage: "video.fill", isOn: $showWebcams, available: model.config?.webcams ?? false, layer: "webcams")
             Spacer(minLength: 0)
         }
@@ -216,6 +220,8 @@ struct TrafficView: View {
         }
     }
 
+    private var shownIncidents: [TrafficIncident] { TrafficLogic.visibleIncidents(model.incidents, showWorks: showWorks) }
+
     private var statusLines: [String] {
         var lines: [String] = []
         if let error = model.configError { lines.append(error) }
@@ -224,7 +230,12 @@ struct TrafficView: View {
             if let error = model.incidentsError {
                 lines.append("Incidents: \(error)")
             } else {
-                lines.append("Incidents nearby: \(model.incidents.count)" + (model.unlocated > 0 ? " (\(model.unlocated) more have no map position)" : ""))
+                let hidden = model.incidents.count - shownIncidents.count
+                var line = "Jams, accidents and hazards nearby: \(shownIncidents.count)"
+                if showWorks { line = "Incidents and works nearby: \(shownIncidents.count)" }
+                if hidden > 0 { line += " (\(hidden) roadworks and closures hidden: tap Works)" }
+                if model.unlocated > 0 { line += " (\(model.unlocated) have no map position)" }
+                lines.append(line)
             }
         }
         if showWebcams, model.config?.webcams == true {

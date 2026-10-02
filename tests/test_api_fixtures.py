@@ -55,8 +55,11 @@ def fake_traffic(monkeypatch):
     """The traffic endpoints answer from the hand-written samples in test_traffic.py instead of the network."""
     from app import traffic
     from app.config import settings
-    from test_traffic import SAMPLE, WINDY_JSON
+    from app import tmc
+    from test_traffic import LOC, NOW, SAMPLE, WINDY_JSON
     traffic._cache.clear()
+    monkeypatch.setattr(traffic, "_now", lambda: NOW)
+    monkeypatch.setattr(tmc, "locations", lambda: LOC)
     monkeypatch.setattr(settings, "opentransportdata_api_key", "fixture-key")
     monkeypatch.setattr(settings, "windy_api_key", "fixture-key")
     monkeypatch.setattr(traffic, "_post_soap", lambda body: SAMPLE)

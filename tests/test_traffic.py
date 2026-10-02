@@ -1,15 +1,18 @@
 """app/traffic.py and /api/v1/traffic/*. The network is always faked; the DATEX II sample is hand-written (tests/data/datex_sample.xml), not a real capture."""
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 import pytest
 
-from app import traffic
+from app import tmc, traffic
 from app.config import settings
 from conftest import ALICE
 
 SAMPLE = (Path(__file__).parent / "data" / "datex_sample.xml").read_bytes()
 ZURICH = (47.3769, 8.5417)
+NOW = datetime(2026, 10, 2, 9, 0, tzinfo=timezone.utc)                  # what the sample's validity times are written against
+LOC = {"7.5": {"1001": (47.36, 8.50), "1002": (47.38, 8.52)}, "7.4": {}}
 WINDY_JSON = {"webcams": [
     {"webcamId": 111, "title": "Hardbrucke", "location": {"latitude": 47.3869, "longitude": 8.5217},
      "images": {"current": {"preview": "https://img.example/111.jpg"}}, "urls": {"detail": "https://windy.example/111"},
@@ -22,6 +25,8 @@ WINDY_JSON = {"webcams": [
 @pytest.fixture(autouse=True)
 def clean(monkeypatch):
     traffic._cache.clear()
+    monkeypatch.setattr(traffic, "_now", lambda: NOW)
+    monkeypatch.setattr(tmc, "locations", lambda: LOC)
     monkeypatch.setattr(settings, "opentransportdata_api_key", "OTD-SECRET-KEY")
     monkeypatch.setattr(settings, "windy_api_key", "WINDY-SECRET-KEY")
 
@@ -38,40 +43,122 @@ class Resp:
 
 # --------------------------------------------------------------------------------------------------------------------------- DATEX II --
 
-def test_the_sample_is_read_forgivingly():
-    located, unlocated = traffic.parse_datex(SAMPLE)
+def read(xml=SAMPLE, locations=None):
+    return traffic.parse_datex(xml, now=NOW, locations=LOC if locations is None else locations)
+
+
+def one_record(record_type, inner="", comments=""):
+    """A minimal feed with one record at a known position, for the cases that vary one thing."""
+    return (f'<r><situation><situationRecord xsi:type="{record_type}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">{comments}'
+            f'<pointCoordinates><latitude>47</latitude><longitude>8</longitude></pointCoordinates>{inner}</situationRecord></situation></r>').encode()
+
+
+def description(*values):
+    inner = "".join(f'<value lang="{lang}">{text}</value>' for lang, text in values)
+    return f'<generalPublicComment><comment><values>{inner}</values></comment><commentType>description</commentType></generalPublicComment>'
+
+
+def test_the_sample_keeps_exactly_what_a_rider_needs():
+    located, unlocated = read()
     by_id = {i["id"]: i for i in located}
-    assert set(by_id) == {"S1-R1", "S2-R1", "S3-R1", "S5-R1"} and unlocated == 1              # S4 has no coordinates
+    # dropped: S6 released notice, S7 ended, S8 not started, S9 rerouting advice, S10 AbnormalTraffic "other"; S4 has a code its table doesn't know
+    assert set(by_id) == {"S1-R1", "S2-R1", "S3-R1", "S5-R1", "S11-R1"} and unlocated == 1
     accident = by_id["S1-R1"]
     assert (accident["kind"], accident["title"], accident["severity"]) == ("accident", "Accident", "high")
-    assert accident["comment"].startswith("Unfall auf der A1") and accident["road"] == "A1"
+    assert accident["comment"] == "Accident on the A1, right lane closed."                      # English chosen over German; the internal note ignored
     assert (accident["lat"], accident["lon"]) == (47.4123, 8.5712)
     assert accident["start"] == "2026-10-02T08:10:00Z" and accident["end"] == "2026-10-02T10:00:00Z"
-    assert (by_id["S2-R1"]["kind"], by_id["S2-R1"]["lat"]) == ("congestion", 47.3601)           # a linear section: its start
-    assert by_id["S2-R1"]["comment"] == "" and by_id["S2-R1"]["road"] is None
-    assert by_id["S3-R1"]["kind"] == "roadworks" and by_id["S3-R1"]["severity"] is None
+    jam = by_id["S2-R1"]
+    assert (jam["kind"], jam["title"]) == ("congestion", "Queuing traffic")
+    assert (jam["lat"], jam["lon"]) == (47.37, 8.51)                                           # the middle of the section's two ends
+    assert jam["comment"] == "" and jam["end"] is None
+    assert (by_id["S3-R1"]["kind"], by_id["S3-R1"]["title"]) == ("roadworks", "Roadworks")
     assert (by_id["S5-R1"]["kind"], by_id["S5-R1"]["title"]) == ("other", "Traffic event")
+    assert (by_id["S11-R1"]["kind"], by_id["S11-R1"]["title"]) == ("closure", "Road closed")
 
 
 def test_garbage_is_an_error_not_a_crash():
     with pytest.raises(traffic.TrafficUnavailable):
         traffic.parse_datex(b"<html>not the feed")
-    assert traffic.parse_datex(b"<a><situation/></a>") == ([], 0)
-    assert traffic.parse_datex(b"<a/>") == ([], 0)
+    assert traffic.parse_datex(b"<a><situation/></a>", now=NOW) == ([], 0)
+    assert traffic.parse_datex(b"<a/>", now=NOW) == ([], 0)
 
 
 def test_a_zero_zero_position_is_not_a_position():
     xml = b'<r><situation><situationRecord id="x"><pointCoordinates><latitude>0</latitude><longitude>0</longitude></pointCoordinates></situationRecord></situation></r>'
-    assert traffic.parse_datex(xml) == ([], 1)
+    assert traffic.parse_datex(xml, now=NOW) == ([], 1)
+
+
+@pytest.mark.parametrize("text", ["Freigegeben: A3 Chur", "Libéré: A3 Coire", "Approvato: A3 Chur", "Released: A3 Chur", "  freigegeben: x"])
+def test_released_notices_are_dropped_in_every_language(text):
+    assert traffic.parse_datex(one_record("Accident", comments=description(("de-CH", text))), now=NOW) == ([], 0)
+
+
+def test_a_description_that_merely_mentions_released_is_kept():
+    assert len(traffic.parse_datex(one_record("Accident", comments=description(("en-EN", "Lane released after the accident"))), now=NOW)[0]) == 1
+
+
+def test_the_language_falls_back_to_german_then_to_whatever_there_is():
+    def chosen(*values):
+        return traffic.parse_datex(one_record("Accident", comments=description(*values)), now=NOW)[0][0]["comment"]
+    assert chosen(("fr-CH", "fr"), ("de-CH", "de"), ("en-EN", "en")) == "en"
+    assert chosen(("fr-CH", "fr"), ("de-CH", "de")) == "de"
+    assert chosen(("fr-CH", "fr"), ("it-CH", "it")) == "fr"
+
+
+def test_the_same_code_is_looked_up_in_the_table_of_its_own_version():
+    xml = SAMPLE.replace(b"<alertCLocationTableVersion>7.5</alertCLocationTableVersion>", b"<alertCLocationTableVersion>7.3</alertCLocationTableVersion>")
+    other = {"7.3": {"1001": (46.0, 7.0), "1002": (46.0, 7.0)}, "7.5": LOC["7.5"]}
+    jam = {i["id"]: i for i in read(xml, other)[0]}["S2-R1"]
+    assert (jam["lat"], jam["lon"]) == (46.0, 7.0)
+    # a version nobody loaded cannot be used, even if the code exists in another version
+    assert "S2-R1" not in {i["id"] for i in read(xml, {"7.5": LOC["7.5"]})[0]}
+
+
+def test_without_any_location_table_only_records_with_coordinates_are_shown():
+    located, unlocated = read(locations={})
+    assert {i["id"] for i in located} == {"S1-R1", "S3-R1", "S5-R1", "S11-R1"} and unlocated == 2
+
+
+def test_a_section_whose_ends_are_far_apart_uses_its_first_end():
+    far = {"7.5": {"1001": (47.0, 8.0), "1002": (46.0, 7.0)}}                                  # 130 km apart: more likely a table mix-up than a section
+    jam = {i["id"]: i for i in read(locations=far)[0]}["S2-R1"]
+    assert (jam["lat"], jam["lon"]) == (47.0, 8.0)
+
+
+@pytest.mark.parametrize("value,title", [("roadClosed", "Road closed"), ("narrowLanes", "Narrow lanes"), ("singleAlternateLineTraffic", "Single alternate line traffic"),
+                                         ("other", "Closure / lane restriction"), ("", "Closure / lane restriction")])
+def test_titles_come_from_the_feeds_own_detail(value, title):
+    tag = f"<roadOrCarriagewayOrLaneManagementType>{value}</roadOrCarriagewayOrLaneManagementType>" if value else ""
+    assert traffic.parse_datex(one_record("RoadOrCarriagewayOrLaneManagement", tag), now=NOW)[0][0]["title"] == title
+
+
+@pytest.mark.parametrize("jam,title", [("stationaryTraffic", "Stationary traffic"), ("queuingTraffic", "Queuing traffic"), ("slowTraffic", "Slow traffic"), ("heavyTraffic", "Heavy traffic")])
+def test_every_real_jam_type_is_shown_with_its_own_title(jam, title):
+    assert traffic.parse_datex(one_record("AbnormalTraffic", f"<abnormalTrafficType>{jam}</abnormalTrafficType>"), now=NOW)[0][0]["title"] == title
 
 
 def test_incidents_near_filters_by_distance_and_sorts(monkeypatch):
     monkeypatch.setattr(traffic, "_post_soap", lambda body: SAMPLE)
     result = traffic.incidents_near(*ZURICH, 25)
-    assert [i["id"] for i in result["incidents"]] == ["S5-R1", "S2-R1", "S1-R1"]               # Bern's roadworks are 90 km away
+    assert [i["id"] for i in result["incidents"]] == ["S5-R1", "S2-R1", "S1-R1", "S11-R1"]    # Bern's roadworks are 90 km away
     assert [i["distance_km"] for i in result["incidents"]] == sorted(i["distance_km"] for i in result["incidents"])
-    assert result["unlocated"] == 1 and result["total"] == 4
+    assert result["unlocated"] == 1 and result["total"] == 5
     assert [i["id"] for i in traffic.incidents_near(46.95, 7.45, 5)["incidents"]] == ["S3-R1"]
+
+
+def test_a_crowd_of_roadworks_never_pushes_a_jam_out_of_the_answer(monkeypatch):
+    """Near Zurich the 100 nearest records are mostly roadworks; a jam further out must still be there (the app hides works by default)."""
+    works = "".join(f'<situation><situationRecord xsi:type="MaintenanceWorks" id="W{i}"><pointCoordinates><latitude>{47.3769 + i * 0.0002}</latitude><longitude>8.5417</longitude>'
+                    f'</pointCoordinates></situationRecord></situation>' for i in range(300))
+    jam = ('<situation><situationRecord xsi:type="AbnormalTraffic" id="JAM"><pointCoordinates><latitude>47.55</latitude><longitude>8.5417</longitude></pointCoordinates>'
+           '<abnormalTrafficType>queuingTraffic</abnormalTrafficType></situationRecord></situation>')
+    xml = f'<r xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">{works}{jam}</r>'.encode()
+    monkeypatch.setattr(traffic, "_post_soap", lambda body: xml)
+    result = traffic.incidents_near(*ZURICH, 25)["incidents"]
+    assert "JAM" in {i["id"] for i in result}                                         # 19 km away, behind 300 nearer roadworks
+    assert sum(1 for i in result if i["kind"] == "roadworks") == traffic.MAX_WORKS
+    assert [i["distance_km"] for i in result] == sorted(i["distance_km"] for i in result)
 
 
 def test_the_feed_is_fetched_once_for_many_requests(monkeypatch):
@@ -89,7 +176,7 @@ def test_an_old_answer_is_used_when_the_refresh_fails(monkeypatch):
     traffic._cache["incidents"] = (0.0, stored, value)                                         # expired
     def down(body): raise traffic.TrafficUnavailable("down")
     monkeypatch.setattr(traffic, "_post_soap", down)
-    assert len(traffic.incidents_near(*ZURICH, 25)["incidents"]) == 3
+    assert len(traffic.incidents_near(*ZURICH, 25)["incidents"]) == 4
     traffic._cache.clear()
     with pytest.raises(traffic.TrafficUnavailable):
         traffic.incidents_near(*ZURICH, 25)
@@ -217,7 +304,7 @@ def test_config_tells_the_app_which_layers_exist(alice, monkeypatch):
 def test_incidents_endpoint(alice, monkeypatch):
     monkeypatch.setattr(traffic, "_post_soap", lambda body: SAMPLE)
     body = alice.get("/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25").json()
-    assert body["api"] == 1 and len(body["incidents"]) == 3 and body["unlocated"] == 1
+    assert body["api"] == 1 and len(body["incidents"]) == 4 and body["unlocated"] == 1
     assert body["incidents"][0]["distance_km"] <= body["incidents"][-1]["distance_km"]
 
 
