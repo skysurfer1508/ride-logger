@@ -8,6 +8,8 @@ import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from . import geo, gpx, processing
+
 MAP_RIDES_ON_HOME = 20
 RIDES_LIST_LIMIT = 500
 
@@ -152,6 +154,68 @@ def get_ride_points(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> l
         """,
         (ride_id, owner_sub),
     ).fetchall()
+
+
+GPX_DEVICE_ID = "gpx-import"          # marks imported rides (rides.source has a CHECK that only allows two values, and SQLite cannot change it cheaply)
+MIN_IMPORT_DISTANCE_M = 50.0          # a track that moves less than this in total is a recording left running, not a ride
+DUPLICATE_SHARE = 0.8                 # this much of a sample already in the database means the ride is already there
+
+
+def _already_have(conn: sqlite3.Connection, owner_sub: str, points: list[dict]) -> bool:
+    """True if (almost) all of a spread-out sample of these points is already stored for this owner: the same moment, within about a metre. Compared
+    on the first 19 characters of the stored timestamp ("2026-09-28T09:15:00"), which is UTC in every format the server stores."""
+    sample = gpx.sample_for_duplicate_check(points)
+    found = 0
+    for p in sample:
+        moment = p["time"].strftime("%Y-%m-%dT%H:%M:%S")
+        hit = conn.execute(
+            "SELECT 1 FROM points WHERE owner_sub = ? AND substr(timestamp, 1, 19) = ? AND ABS(lat - ?) < 0.00002 AND ABS(lon - ?) < 0.00003 LIMIT 1",
+            (owner_sub, moment, p["lat"], p["lon"]),
+        ).fetchone()
+        found += 1 if hit else 0
+    return found / len(sample) >= DUPLICATE_SHARE
+
+
+def import_tracks(conn: sqlite3.Connection, owner_sub: str, tracks: list[dict]) -> list[dict]:
+    """Stores parsed GPX tracks as rides of this owner. Per track: imported (with the ride id), already_imported (the same file again) or
+    already_have_this_ride (the same moments are in the database, e.g. the ride's own export), or skipped with a reason. Never raises for one bad track."""
+    results = []
+    for track in tracks:
+        pts, name = track["points"], track["name"]
+        trip_id = gpx.import_id(owner_sub, pts)
+        existing = conn.execute("SELECT id FROM rides WHERE trip_id = ? AND owner_sub = ?", (trip_id, owner_sub)).fetchone()
+        if existing:
+            results.append({"status": "already_imported", "name": name, "ride_id": existing["id"], "points": len(pts)})
+            continue
+        if _already_have(conn, owner_sub, pts):
+            results.append({"status": "already_have_this_ride", "name": name, "ride_id": None, "points": len(pts)})
+            continue
+        if geo.total_distance_m(pts) < MIN_IMPORT_DISTANCE_M:
+            results.append({"status": "skipped", "name": name, "ride_id": None, "points": len(pts), "reason": "The track has no movement."})
+            continue
+        speeds = [p["speed"] for p in pts]
+        if any(v is None for v in speeds):
+            derived = gpx.derived_speeds(pts)
+            speeds = [v if v is not None else d for v, d in zip(speeds, derived)]
+        conn.executemany(
+            """
+            INSERT INTO points (owner_sub, device_id, lat, lon, timestamp, speed, altitude, horizontal_accuracy, trip_id, raw_properties)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+            """,
+            [(owner_sub, GPX_DEVICE_ID, p["lat"], p["lon"], p["time"].isoformat(), None if v is None else max(v, 0.0), p["ele"], trip_id,
+              json.dumps({"source": "gpx"})) for p, v in zip(pts, speeds)],
+        )
+        rows = conn.execute(
+            "SELECT * FROM points WHERE trip_id = ? AND owner_sub = ? AND ride_id IS NULL ORDER BY timestamp", (trip_id, owner_sub)
+        ).fetchall()
+        ride_id = processing.compute_and_insert_ride(conn, rows, owner_sub, GPX_DEVICE_ID, "trip_marker", trip_id, None)
+        if ride_id is None:
+            conn.execute("DELETE FROM points WHERE trip_id = ? AND owner_sub = ?", (trip_id, owner_sub))
+            results.append({"status": "skipped", "name": name, "ride_id": None, "points": len(pts), "reason": "The track has no movement or no duration."})
+            continue
+        results.append({"status": "imported", "name": name, "ride_id": ride_id, "points": len(pts)})
+    conn.commit()
+    return results
 
 
 def delete_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> bool:

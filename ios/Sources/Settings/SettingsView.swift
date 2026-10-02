@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     let api: APIClient
@@ -21,6 +22,7 @@ struct SettingsView: View {
     @State private var confirmRegenerate = false
     @State private var confirmSignOut = false
     @State private var busy = false
+    @State private var showImporter = false
 
     struct Banner: Equatable {
         let text: String
@@ -50,6 +52,7 @@ struct SettingsView: View {
                     }
                     accountPanel
                     recordingPanel
+                    dataPanel
                     overlandPanel
                     detectionPanel
                     aboutPanel
@@ -75,6 +78,9 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Anything not uploaded yet is lost for good.")
+            }
+            .fileImporter(isPresented: $showImporter, allowedContentTypes: [UTType(filenameExtension: "gpx") ?? .xml, .xml, .data]) { result in
+                Task { await importGPX(result) }
             }
             .confirmationDialog("Regenerate the upload token?", isPresented: $confirmRegenerate, titleVisibility: .visible) {
                 Button("Regenerate", role: .destructive) { Task { await regenerate() } }
@@ -147,6 +153,38 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var dataPanel: some View {
+        Panel(title: "Your data") {
+            Text("Bring in a ride recorded with another app (Strava, Komoot, a bike computer) as a GPX file. To get a ride out, open it and tap the share icon.")
+                .font(.footnote).foregroundStyle(Theme.muted)
+            Button("Import a ride from a GPX file…") { showImporter = true }
+                .buttonStyle(.bordered)
+                .disabled(busy)
+        }
+    }
+
+    private func importGPX(_ result: Result<URL, Error>) async {
+        guard case .success(let url) = result else { return }                    // the picker was cancelled
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        busy = true
+        defer { busy = false }
+        do {
+            guard let data = try? Data(contentsOf: url) else {
+                banner = Banner(text: "That file could not be read.", isError: true)
+                return
+            }
+            let response: ImportResponse = try await api.postFile("import/gpx", field: "file", filename: url.lastPathComponent,
+                                                                  mimeType: "application/gpx+xml", data: data)
+            banner = Banner(text: ImportSummary.text(response), isError: false)
+            if response.imported > 0 { NotificationCenter.default.post(name: .ridesChanged, object: nil) }
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            banner = Banner(text: (error as? LocalizedError)?.errorDescription ?? "Couldn't import the file.", isError: true)
         }
     }
 

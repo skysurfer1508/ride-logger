@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.5"
-    CURRENT_PROJECT_VERSION: "6"
+    MARKETING_VERSION: "1.6"
+    CURRENT_PROJECT_VERSION: "7"
 targets:
   RideLog:
     type: application
@@ -25,6 +25,9 @@ targets:
       - Shared
     dependencies:
       - target: RideLogWidgets                         # the Live Activity / Dynamic Island (embedded in the app)
+    scheme:
+      testTargets:
+        - RideLogTests                                 # `xcodebuild test -scheme RideLog` (and Cmd+U) runs the unit tests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger
@@ -86,6 +89,7 @@ targets:
       - Sources/API/TrackModels.swift
       - Sources/Core/TrackMath.swift
       - Sources/API/TrafficModels.swift
+      - Sources/API/ImportModels.swift
       - Sources/Core/TrafficLogic.swift
       - Sources/API/ResponseCache.swift
       - Sources/Recording/RecordingLogic.swift

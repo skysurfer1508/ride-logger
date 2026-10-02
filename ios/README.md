@@ -116,6 +116,27 @@ The feed's limits are 5 calls per minute; the server fetches it at most once eve
 
 Overview (totals, records, weekly chart) moved from its own tab to a row on the Home screen to keep the tab bar at five.
 
+## GPX export and import
+
+- **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple
+  Files or a mail attachment can take it. It is also a backup of that ride.
+- **Import:** Settings > Your data > *Import a ride from a GPX file*. Files from other apps work (a speed is worked out from the positions when the file has
+  none); a file with several tracks makes several rides. It is safe to repeat: the same file, or a ride whose moments are already stored (for example
+  your own export), is recognised and not added twice. Refused with a plain message: files without timestamps, tracks that do not move, files over 15 MB,
+  and files containing DOCTYPE/ENTITY declarations. Imported rides are marked in the database with the device name `gpx-import`.
+- Rides recorded by Overland before RideLog are already in the same database, so they need no import.
+
+## The automatic compile check (GitHub Actions)
+
+Every push that changes something under `ios/` makes GitHub build the app and run the unit tests on a Mac in the cloud (`.github/workflows/ios.yml`).
+You will see a green tick or a red cross next to the commit on GitHub; on a red one open it, then *Summary*, and paste the compiler errors listed there to
+Claude Code. This catches Swift mistakes before they reach your phone. Things to know:
+- **Cost:** macOS minutes count ten times against a private repository's free allowance (2,000 minutes a month is about 200 minutes of Mac time). A run takes
+  roughly 10-15 minutes, so keep an eye on *Settings > Billing > Actions* at first. Put `[skip ci]` in a commit message to skip a run, and a newer push cancels
+  an older run that is still going.
+- It only checks that everything compiles and the unit tests pass. It cannot test GPS, the screen-locked behaviour, Bluetooth or the Watch: those still need your phone.
+- You can also start it by hand: GitHub > Actions > *iOS build and tests* > *Run workflow*.
+
 ## Deleting rides
 
 Rides > swipe a ride to the left > **Delete**, or open a ride and tap the trash icon. Both ask first. Deleting removes the ride **and its GPS points** from
@@ -178,6 +199,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-Automatic start and stop, a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+Automatic start and stop (next), a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
 real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.

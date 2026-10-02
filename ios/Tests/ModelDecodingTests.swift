@@ -158,6 +158,15 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertNil(result.webcams[1].detailUrl)
     }
 
+    func testImportResponse() throws {
+        let json = #"{"api":1,"imported":1,"results":[{"status":"imported","name":"Evening loop","ride_id":12,"points":60},{"status":"skipped","name":"x","ride_id":null,"points":5,"reason":"The track has no movement."}]}"#
+        let response = try JSONDecoder.ridelog.decode(ImportResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(response.imported, 1)
+        XCTAssertEqual(response.results[0], ImportResult(status: "imported", name: "Evening loop", rideId: 12, points: 60, reason: nil))
+        XCTAssertNil(response.results[1].rideId)
+        XCTAssertEqual(response.results[1].reason, "The track has no movement.")
+    }
+
     func testDeleteResponse() throws {
         let json = #"{"api":1,"deleted":42}"#
         XCTAssertEqual(try JSONDecoder.ridelog.decode(DeleteResponse.self, from: Data(json.utf8)).deleted, 42)

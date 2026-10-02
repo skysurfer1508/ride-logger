@@ -1,0 +1,83 @@
+# Compiles the iOS app and runs its unit tests on a Mac in the cloud, so a Swift error shows up here (a red cross on the commit) and not on your phone.
+# It only runs when something under ios/ changes (or by hand from the Actions tab), because macOS minutes cost 10x on a private repository's free plan.
+# If it fails, open the run: the "Summary" lists the first compiler errors. Paste them to Claude Code.
+name: iOS build and tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true          # a newer push makes an older run pointless
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          xcodebuild -version
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          def version(runtime):
+              tail = runtime.rsplit("iOS-", 1)[-1]
+              return tuple(int(x) for x in tail.split("-") if x.isdigit())
+          runtimes = sorted((r for r in data if "iOS-" in r), key=version, reverse=True)
+          for r in runtimes:
+              for d in data[r]:
+                  if d.get("isAvailable") and d["name"].startswith("iPhone"):
+                      print(d["udid"]); raise SystemExit
+          raise SystemExit("no iPhone simulator found")
+          ')
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build and run the unit tests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project RideLog.xcodeproj \
+            -scheme RideLog \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Summary of problems
+        if: always()
+        run: |
+          {
+            echo "## Compiler errors and failed tests"
+            echo '```'
+            grep -E "error:|\*\* (BUILD|TEST) FAILED|Test Case .* failed|XCTAssert" "$RUNNER_TEMP/xcodebuild.log" | sort -u | head -60 || true
+            echo '```'
+            echo "Last lines of the log:"
+            echo '```'
+            tail -25 "$RUNNER_TEMP/xcodebuild.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the full log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          retention-days: 7

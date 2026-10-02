@@ -5,10 +5,12 @@ Unauthenticated calls get a plain 401 (require_api_login), never a redirect. Any
 X-RideLog-Client header (require_api_client). This is a different surface from POST /api/ingest, which Overland and the app's
 recorder use with a bearer token.
 """
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from datetime import datetime
 
-from .. import osm, track, traffic, views
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
+
+from .. import gpx, osm, track, traffic, views
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..config import settings
 from ..db import get_db
@@ -128,6 +130,40 @@ def ride_track(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
     finally:
         conn.close()
     return reply({"ride": views.ride_summary(view), **result})
+
+
+@router.get("/rides/{ride_id}/gpx")
+def ride_gpx(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
+    """The ride as a GPX 1.1 file (every stored point), for another app or as a backup."""
+    conn = get_db()
+    try:
+        found = views.get_ride(conn, owner_sub, ride_id)
+        rows = views.get_ride_points(conn, owner_sub, ride_id)
+    finally:
+        conn.close()
+    if not found or rows is None:
+        raise HTTPException(status_code=404, detail="ride_not_found")
+    view, _ = found
+    start = datetime.fromisoformat(view["start_time"])
+    body = gpx.build_gpx(rows, f"RideLog {start:%Y-%m-%d %H:%M}")
+    return Response(content=body, media_type="application/gpx+xml",
+                    headers={"Content-Disposition": f'attachment; filename="ridelog-{start:%Y%m%d-%H%M}.gpx"', "Cache-Control": "no-store"})
+
+
+@router.post("/import/gpx", dependencies=[Depends(require_api_client)])
+def import_gpx(file: UploadFile = File(...), owner_sub: str = Depends(current_owner_sub)):
+    """Adds the track(s) of a GPX file from another app as rides. Safe to repeat: the same file or the same moments are recognised."""
+    data = file.file.read(gpx.MAX_BYTES + 1)
+    try:
+        tracks = gpx.parse_gpx(data)
+    except gpx.GpxError as e:
+        raise HTTPException(status_code=413 if len(data) > gpx.MAX_BYTES else 400, detail={"detail": "gpx_invalid", "message": str(e)})
+    conn = get_db()
+    try:
+        results = views.import_tracks(conn, owner_sub, tracks)
+    finally:
+        conn.close()
+    return reply({"results": results, "imported": sum(1 for r in results if r["status"] == "imported")})
 
 
 @router.delete("/rides/{ride_id}", dependencies=[Depends(require_api_client)])

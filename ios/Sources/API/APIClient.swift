@@ -66,6 +66,50 @@ final class APIClient: ObservableObject {
         return try decode(try await sendRaw(request))
     }
 
+    /// A file download (a ride's GPX), saved to a temporary file named as the server suggests.
+    func download(_ path: String) async throws -> URL {
+        var comps = URLComponents(url: Config.baseURL, resolvingAgainstBaseURL: false)!
+        comps.path = "/api/v1/" + path
+        let data: Data
+        let response: URLResponse
+        do { (data, response) = try await session.data(from: comps.url!) } catch { throw APIError.offline }
+        guard let http = response as? HTTPURLResponse else { throw APIError.server(0) }
+        if http.statusCode == 401 {
+            await MainActor.run { onUnauthorized?() }
+            throw APIError.unauthorized
+        }
+        guard (200..<300).contains(http.statusCode) else { throw APIError.server(http.statusCode) }
+        var name = "ride.gpx"
+        if let disposition = http.value(forHTTPHeaderField: "Content-Disposition"), let range = disposition.range(of: "filename=\"") {
+            let rest = disposition[range.upperBound...]
+            if let end = rest.firstIndex(of: "\"") { name = String(rest[..<end]) }
+        }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent(name.replacingOccurrences(of: "/", with: "-"))
+        try data.write(to: file)
+        return file
+    }
+
+    /// A file upload (multipart/form-data), e.g. a GPX file to import.
+    func postFile<T: Decodable>(_ path: String, field: String, filename: String, mimeType: String, data fileData: Data) async throws -> T {
+        let boundary = "RideLogBoundary-" + UUID().uuidString
+        var body = Data()
+        func add(_ text: String) { body.append(Data(text.utf8)) }
+        let safeName = filename.replacingOccurrences(of: "\"", with: "%22").replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "")
+        add("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(field)\"; filename=\"\(safeName)\"\r\nContent-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        add("\r\n--\(boundary)--\r\n")
+        var request = URLRequest(url: Config.baseURL.appendingPathComponent("api/v1/" + path))
+        request.httpMethod = "POST"
+        request.setValue(Config.clientHeaderValue, forHTTPHeaderField: Config.clientHeaderName)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        request.timeoutInterval = 120
+        return try decode(try await sendRaw(request))
+    }
+
     private func decode<T: Decodable>(_ data: Data) throws -> T {
         do {
             return try JSONDecoder.ridelog.decode(T.self, from: data)
@@ -88,7 +132,7 @@ final class APIClient: ObservableObject {
             throw APIError.unauthorized
         }
         guard (200..<300).contains(status) else {
-            if status == 502, let text = Self.serviceMessage(in: data) { throw APIError.message(text) }
+            if [400, 413, 502].contains(status), let text = Self.serviceMessage(in: data) { throw APIError.message(text) }
             throw APIError.server(status)
         }
         return data

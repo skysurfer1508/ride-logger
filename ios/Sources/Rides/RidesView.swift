@@ -226,6 +226,8 @@ struct RideDetailView: View {
     @State private var confirmDelete = false
     @State private var deleting = false
     @State private var errorText: String?
+    @State private var shareItem: ShareItem?
+    @State private var exporting = false
 
     var body: some View {
         LoaderScreen(api: api, path: "rides/\(ride.id)/track") { (track: TrackResponse) in
@@ -235,21 +237,37 @@ struct RideDetailView: View {
         .navigationTitle(Format.shortDay(iso: ride.startTime))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button { Task { await exportGPX() } } label: { Image(systemName: "square.and.arrow.up") }
+                    .disabled(exporting)
+                    .accessibilityLabel("Export this ride as a GPX file")
                 Button(role: .destructive) { confirmDelete = true } label: { Image(systemName: "trash") }
                     .disabled(deleting)
                     .accessibilityLabel("Delete this ride")
             }
         }
+        .sheet(item: $shareItem) { item in ShareSheet(items: [item.url]) }
         .confirmationDialog("Delete this ride?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete ride", role: .destructive) { Task { await delete() } }
         } message: {
             Text("The ride and its GPS track are removed from your server. This can't be undone.")
         }
-        .alert("Couldn't delete the ride", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
+        .alert("Something went wrong", isPresented: Binding(get: { errorText != nil }, set: { if !$0 { errorText = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorText ?? "")
+        }
+    }
+
+    private func exportGPX() async {
+        exporting = true
+        defer { exporting = false }
+        do {
+            shareItem = ShareItem(url: try await api.download("rides/\(ride.id)/gpx"))
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
         }
     }
 
@@ -269,4 +287,21 @@ struct RideDetailView: View {
             errorText = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
         }
     }
+}
+
+/// A file to hand to the share sheet.
+struct ShareItem: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+/// The system share sheet (Files, AirDrop, Strava, Mail ...).
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
