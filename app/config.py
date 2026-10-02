@@ -25,5 +25,12 @@ class Settings(BaseSettings):
     # The public Overpass servers ask for an identifying User-Agent: put a contact in it, e.g. "ride-logger/1.0 (you@example.com)".
     osm_user_agent: str = "ride-logger/1.0 (self-hosted)"
 
+    # The app's Traffic tab. Both are optional and free; leave a key empty to switch that layer off (the app then says how to set it up).
+    # Apple's own live traffic colours on the map need no key at all (MapKit draws them on the phone).
+    #   opentransportdata_api_key: official Swiss traffic situations (accidents, congestion, roadworks), from https://api-manager.opentransportdata.swiss
+    #   windy_api_key: public webcams near a spot, from https://api.windy.com/keys
+    opentransportdata_api_key: str = ""
+    windy_api_key: str = ""
+
 
 settings = Settings()

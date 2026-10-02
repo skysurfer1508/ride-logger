@@ -29,6 +29,9 @@ ENDPOINTS = {
     "api_overview": "/api/v1/overview",
     "api_map": "/api/v1/map",
     "api_settings": "/api/v1/settings",
+    "api_traffic_config": "/api/v1/traffic/config",
+    "api_traffic_incidents": "/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25",
+    "api_traffic_webcams": "/api/v1/traffic/webcams?lat=47.3769&lon=8.5417&radius_km=15",
 }
 
 
@@ -45,6 +48,19 @@ def shape(value):
     if isinstance(value, (int, float)):
         return "number"
     return "string"
+
+
+@pytest.fixture(autouse=True)
+def fake_traffic(monkeypatch):
+    """The traffic endpoints answer from the hand-written samples in test_traffic.py instead of the network."""
+    from app import traffic
+    from app.config import settings
+    from test_traffic import SAMPLE, WINDY_JSON
+    traffic._cache.clear()
+    monkeypatch.setattr(settings, "opentransportdata_api_key", "fixture-key")
+    monkeypatch.setattr(settings, "windy_api_key", "fixture-key")
+    monkeypatch.setattr(traffic, "_post_soap", lambda body: SAMPLE)
+    monkeypatch.setattr(traffic, "_windy_get", lambda params: WINDY_JSON)
 
 
 @pytest.fixture

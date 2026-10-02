@@ -1,0 +1,25 @@
+{
+ "api": 1,
+ "webcams": [
+  {
+   "detail_url": "https://windy.example/111",
+   "distance_km": 1.9,
+   "id": "111",
+   "lat": 47.3869,
+   "lon": 8.5217,
+   "player_url": "https://player.example/111",
+   "preview": "https://img.example/111.jpg",
+   "title": "Hardbrucke"
+  },
+  {
+   "detail_url": null,
+   "distance_km": 30.2,
+   "id": "222",
+   "lat": 47.5,
+   "lon": 8.9,
+   "player_url": null,
+   "preview": null,
+   "title": "Far away"
+  }
+ ]
+}

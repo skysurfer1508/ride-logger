@@ -8,7 +8,7 @@ recorder use with a bearer token.
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from .. import osm, track, views
+from .. import osm, track, traffic, views
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..config import settings
 from ..db import get_db
@@ -141,6 +141,38 @@ def delete_ride(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
     if not deleted:
         raise HTTPException(status_code=404, detail="ride_not_found")
     return reply({"deleted": ride_id})
+
+
+# ------------------------------------------------------------------------------------------------------------------------------ traffic --
+
+@router.get("/traffic/config")
+def traffic_config():
+    """Which Traffic-tab layers the server has keys for. (Apple's traffic colours need no key: the phone draws them itself.)"""
+    return reply({"incidents": traffic.incidents_configured(), "webcams": traffic.webcams_configured()})
+
+
+def _traffic_failed(e: traffic.TrafficUnavailable) -> HTTPException:
+    return HTTPException(status_code=502, detail={"detail": "traffic_unavailable", "message": str(e)})
+
+
+@router.get("/traffic/incidents")
+def traffic_incidents(lat: float = Query(ge=-90, le=90), lon: float = Query(ge=-180, le=180), radius_km: float = Query(default=25, gt=0, le=100)):
+    if not traffic.incidents_configured():
+        raise HTTPException(status_code=404, detail="not_configured")
+    try:
+        return reply(traffic.incidents_near(lat, lon, radius_km))
+    except traffic.TrafficUnavailable as e:
+        raise _traffic_failed(e)
+
+
+@router.get("/traffic/webcams")
+def traffic_webcams(lat: float = Query(ge=-90, le=90), lon: float = Query(ge=-180, le=180), radius_km: float = Query(default=15, gt=0, le=50)):
+    if not traffic.webcams_configured():
+        raise HTTPException(status_code=404, detail="not_configured")
+    try:
+        return reply(traffic.webcams_near(lat, lon, radius_km))
+    except traffic.TrafficUnavailable as e:
+        raise _traffic_failed(e)
 
 
 @router.get("/overview")

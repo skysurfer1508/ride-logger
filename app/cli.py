@@ -122,12 +122,19 @@ def claim_legacy(email: str) -> None:
         conn.close()
 
 
+def check_traffic() -> None:
+    from . import traffic
+    for line in traffic.check():
+        print(line)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ride Logger maintenance CLI")
     sub = parser.add_subparsers(dest="command", required=True)
     reprocess_p = sub.add_parser("reprocess", help="Recompute rides from raw points")
     reprocess_p.add_argument("--since", help="ISO date; only reprocess points from this date on")
     sub.add_parser("sweep", help="Finalize stale open trips / gap-inferred rides")
+    sub.add_parser("check-traffic", help="Call the Traffic tab's data sources once and show what came back")
     claim_p = sub.add_parser("claim-legacy", help="Assign pre-multi-user data to an account")
     claim_p.add_argument("email", help="Email of the account to assign legacy data to")
     args = parser.parse_args()
@@ -136,6 +143,8 @@ def main() -> None:
         reprocess(args.since)
     elif args.command == "sweep":
         sweep()
+    elif args.command == "check-traffic":
+        check_traffic()
     elif args.command == "claim-legacy":
         claim_legacy(args.email)
 

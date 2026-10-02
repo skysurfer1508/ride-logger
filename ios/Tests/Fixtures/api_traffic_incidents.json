@@ -1,0 +1,46 @@
+{
+ "api": 1,
+ "incidents": [
+  {
+   "comment": "",
+   "distance_km": 0.9,
+   "end": null,
+   "id": "S5-R1",
+   "kind": "other",
+   "lat": 47.38,
+   "lon": 8.53,
+   "road": null,
+   "severity": null,
+   "start": null,
+   "title": "Traffic event"
+  },
+  {
+   "comment": "",
+   "distance_km": 3.0,
+   "end": null,
+   "id": "S2-R1",
+   "kind": "congestion",
+   "lat": 47.3601,
+   "lon": 8.5101,
+   "road": null,
+   "severity": "medium",
+   "start": null,
+   "title": "Congestion"
+  },
+  {
+   "comment": "Unfall auf der A1, rechter Fahrstreifen gesperrt.",
+   "distance_km": 4.5,
+   "end": "2026-10-02T10:00:00Z",
+   "id": "S1-R1",
+   "kind": "accident",
+   "lat": 47.4123,
+   "lon": 8.5712,
+   "road": "A1",
+   "severity": "high",
+   "start": "2026-10-02T08:10:00Z",
+   "title": "Accident"
+  }
+ ],
+ "total": 4,
+ "unlocated": 1
+}
