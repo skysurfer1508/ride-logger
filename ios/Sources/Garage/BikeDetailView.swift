@@ -120,17 +120,17 @@ struct BikeDetailView: View {
     private func fuelPanel(_ d: BikeDetail) -> some View {
         Panel(title: "Fuel") {
             HStack {
-                StatTile(value: d.fuel.averageLPer100km.map { String(format: "%.1f", $0) } ?? "-", unit: d.fuel.averageLPer100km == nil ? "" : "L/100 km", label: "Average")
+                StatTile(value: d.fuel.averageLPer100Km.map { String(format: "%.1f", $0) } ?? "-", unit: d.fuel.averageLPer100Km == nil ? "" : "L/100 km", label: "Average")
                 StatTile(value: d.fuel.averagePricePerLitre.map { String(format: "%.2f", $0) } ?? "-", label: "Price per litre")
             }
-            if d.fuel.averageLPer100km == nil {
+            if d.fuel.averageLPer100Km == nil {
                 Text("Consumption needs two full-tank fill-ups. Fill up, enter it here, and again next time.").font(.footnote).foregroundStyle(Theme.muted)
             }
-            let measured = d.fuel.fills.filter { $0.lPer100km != nil }.reversed().map { $0 }
+            let measured = d.fuel.fills.filter { $0.lPer100Km != nil }.reversed().map { $0 }
             if measured.count >= 2 {
                 Chart(measured) { fill in
-                    LineMark(x: .value("Date", fill.date), y: .value("L/100 km", fill.lPer100km ?? 0)).foregroundStyle(Theme.accent)
-                    PointMark(x: .value("Date", fill.date), y: .value("L/100 km", fill.lPer100km ?? 0)).foregroundStyle(Theme.accent)
+                    LineMark(x: .value("Date", fill.date), y: .value("L/100 km", fill.lPer100Km ?? 0)).foregroundStyle(Theme.accent)
+                    PointMark(x: .value("Date", fill.date), y: .value("L/100 km", fill.lPer100Km ?? 0)).foregroundStyle(Theme.accent)
                 }
                 .chartYAxis { AxisMarks { _ in AxisGridLine().foregroundStyle(Theme.border); AxisValueLabel().foregroundStyle(Theme.muted) } }
                 .chartXAxis(.hidden)
@@ -140,7 +140,7 @@ struct BikeDetailView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(fill.date) · \(GarageLogic.odometer(fill.odometerKm))").font(.footnote).foregroundStyle(Theme.text)
-                        Text(String(format: "%.1f L", fill.litres) + (fill.fullTank ? "" : " · part fill") + (fill.lPer100km.map { " · " + GarageLogic.consumption($0) } ?? ""))
+                        Text(String(format: "%.1f L", fill.litres) + (fill.fullTank ? "" : " · part fill") + (fill.lPer100Km.map { " · " + GarageLogic.consumption($0) } ?? ""))
                             .font(.caption).foregroundStyle(Theme.muted)
                     }
                     Spacer()

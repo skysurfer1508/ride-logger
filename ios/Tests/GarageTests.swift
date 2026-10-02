@@ -30,9 +30,9 @@ final class GarageDecodingTests: XCTestCase {
         XCTAssertEqual(detail.serviceLog.first?.cost, 180.5)
         XCTAssertEqual(detail.serviceLog.first?.itemName, "Oil change")
         XCTAssertEqual(detail.fuel.fills.count, 2)
-        XCTAssertEqual(detail.fuel.fills[0].lPer100km, 4.4)                                  // newest first
-        XCTAssertNil(detail.fuel.fills[1].lPer100km)                                          // the first full tank is only a starting point
-        XCTAssertEqual(detail.fuel.averageLPer100km, 4.4)
+        XCTAssertEqual(detail.fuel.fills[0].lPer100Km, 4.4)                                  // newest first
+        XCTAssertNil(detail.fuel.fills[1].lPer100Km)                                          // the first full tank is only a starting point
+        XCTAssertEqual(detail.fuel.averageLPer100Km, 4.4)
         XCTAssertEqual(detail.fuel.totalSpent, 47.1, accuracy: 0.001)
         XCTAssertTrue(detail.fuel.fills[0].fullTank)
         XCTAssertEqual(detail.expenses.first?.category, "Tyres")
@@ -45,7 +45,7 @@ final class GarageDecodingTests: XCTestCase {
         let detail = try JSONDecoder.ridelog.decode(BikeDetail.self, from: Data(json.utf8))
         XCTAssertEqual(detail.bike.id, 7)
         XCTAssertNil(detail.bike.year)
-        XCTAssertNil(detail.fuel.averageLPer100km)
+        XCTAssertNil(detail.fuel.averageLPer100Km)
         XCTAssertNil(detail.totals.perKm)
     }
 }
@@ -113,5 +113,15 @@ final class GarageLogicTests: XCTestCase {
         XCTAssertEqual(ReminderPolicy.text(overdue: 1, soon: 0), "1 service is overdue.")
         XCTAssertEqual(ReminderPolicy.text(overdue: 2, soon: 1), "2 services are overdue, 1 is due soon.")
         XCTAssertEqual(ReminderPolicy.text(overdue: 0, soon: 3), "3 are due soon.")
+    }
+}
+
+/// Swift's snake_case decoding spells "l_per_100km" as lPer100Km: a property named lPer100km silently stays nil.
+final class GarageKeySpellingTests: XCTestCase {
+    func testConsumptionKeysWithDigitsAreRead() throws {
+        struct Fill: Decodable { let lPer100Km: Double?; let averageLPer100Km: Double? }
+        let fill = try JSONDecoder.ridelog.decode(Fill.self, from: Data(#"{"l_per_100km": 4.4, "average_l_per_100km": 5.1}"#.utf8))
+        XCTAssertEqual(fill.lPer100Km, 4.4)
+        XCTAssertEqual(fill.averageLPer100Km, 5.1)
     }
 }

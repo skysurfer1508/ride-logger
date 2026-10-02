@@ -101,13 +101,13 @@ struct FuelFill: Decodable, Identifiable, Equatable {
     let litres: Double
     let price: Double?
     let fullTank: Bool
-    let lPer100km: Double?
+    let lPer100Km: Double?
     let kmSince: Double?
 }
 
 struct FuelBlock: Decodable, Equatable {
     let fills: [FuelFill]
-    let averageLPer100km: Double?
+    let averageLPer100Km: Double?
     let measuredKm: Double
     let totalLitres: Double
     let totalSpent: Double
