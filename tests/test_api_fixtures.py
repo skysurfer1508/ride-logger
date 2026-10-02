@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 from conftest import ALICE, add_ride, add_token
+from test_track import insert_points
+from trackgen import make_rows
 
 FIXTURES = Path(__file__).resolve().parent.parent / "ios" / "Tests" / "Fixtures"
 ENDPOINTS = {
@@ -23,6 +25,7 @@ ENDPOINTS = {
     "api_home": "/api/v1/home",
     "api_rides": "/api/v1/rides",
     "api_ride_detail": "/api/v1/rides/{ride_id}",
+    "api_track": "/api/v1/rides/{ride_id}/track",
     "api_overview": "/api/v1/overview",
     "api_map": "/api/v1/map",
     "api_settings": "/api/v1/settings",
@@ -53,6 +56,8 @@ def seeded(alice):
         start = (today - timedelta(days=days)).isoformat()
         ids.append(add_ride(ALICE["sub"], start, distance_m=km * 1000, duration_s=minutes * 60, max_mps=top, climb_m=climb, points=180,
                             polyline=[[47.3769, 8.5417], [47.3801, 8.5502], [47.3866, 8.5611], [47.3902, 8.5739]]))
+    # ride ids[1] gets a real track (a light with fixes, a wait with none) so api_track.json has stops in it
+    insert_points(ALICE["sub"], ids[1], make_rows([("drive", 40, 12), ("stop", 25, "zero"), ("drive", 30, 14), ("stop", 40, "gap"), ("drive", 30, 12)]))
     return ids
 
 

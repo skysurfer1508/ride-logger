@@ -8,7 +8,7 @@ recorder use with a bearer token.
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from .. import views
+from .. import track, views
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..config import settings
 from ..db import get_db
@@ -110,6 +110,21 @@ def ride_detail(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
         raise HTTPException(status_code=404, detail="ride_not_found")
     view, polyline = found
     return reply({"ride": views.ride_summary(view), "polyline": polyline})
+
+
+@router.get("/rides/{ride_id}/track")
+def ride_track(ride_id: int, owner_sub: str = Depends(current_owner_sub)):
+    """The ride's GPS track with speed at every fix, its top speed and the stops in it, for the map, the scrubber and the replay."""
+    conn = get_db()
+    try:
+        found = views.get_ride(conn, owner_sub, ride_id)
+        rows = views.get_ride_points(conn, owner_sub, ride_id)
+    finally:
+        conn.close()
+    if not found or rows is None:
+        raise HTTPException(status_code=404, detail="ride_not_found")
+    view, _ = found
+    return reply({"ride": views.ride_summary(view), **track.build_track(rows)})
 
 
 @router.delete("/rides/{ride_id}", dependencies=[Depends(require_api_client)])

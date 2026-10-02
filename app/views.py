@@ -140,6 +140,20 @@ def get_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> tuple[di
     return ride_view(ride), json.loads(ride["polyline_simplified"])
 
 
+def get_ride_points(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> list | None:
+    """The GPS points of one of the owner's rides, oldest first, or None if it isn't theirs / doesn't exist (same None for both)."""
+    owned = conn.execute("SELECT 1 FROM rides WHERE id = ? AND owner_sub = ?", (ride_id, owner_sub)).fetchone()
+    if not owned:
+        return None
+    return conn.execute(
+        """
+        SELECT id, lat, lon, timestamp, speed, altitude, horizontal_accuracy FROM points
+        WHERE ride_id = ? AND owner_sub = ? ORDER BY timestamp
+        """,
+        (ride_id, owner_sub),
+    ).fetchall()
+
+
 def delete_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> bool:
     """Removes one of the owner's rides together with all of its GPS points. False (and nothing touched) if it isn't theirs or doesn't exist.
 

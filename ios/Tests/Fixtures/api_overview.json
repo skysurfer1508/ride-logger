@@ -3,26 +3,6 @@
  "avg_speed_display": "51",
  "calendar": [
   {
-   "date": "2026-07-01",
-   "km": 0.0,
-   "level": 0
-  },
-  {
-   "date": "2026-07-02",
-   "km": 0.0,
-   "level": 0
-  },
-  {
-   "date": "2026-07-03",
-   "km": 0.0,
-   "level": 0
-  },
-  {
-   "date": "2026-07-04",
-   "km": 0.0,
-   "level": 0
-  },
-  {
    "date": "2026-07-05",
    "km": 0.0,
    "level": 0
@@ -299,8 +279,8 @@
   },
   {
    "date": "2026-08-29",
-   "km": 260.3,
-   "level": 4
+   "km": 0.0,
+   "level": 0
   },
   {
    "date": "2026-08-30",
@@ -319,8 +299,8 @@
   },
   {
    "date": "2026-09-02",
-   "km": 0.0,
-   "level": 0
+   "km": 260.3,
+   "level": 4
   },
   {
    "date": "2026-09-03",
@@ -404,8 +384,8 @@
   },
   {
    "date": "2026-09-19",
-   "km": 88.0,
-   "level": 3
+   "km": 0.0,
+   "level": 0
   },
   {
    "date": "2026-09-20",
@@ -424,8 +404,8 @@
   },
   {
    "date": "2026-09-23",
-   "km": 0.0,
-   "level": 0
+   "km": 88.0,
+   "level": 3
   },
   {
    "date": "2026-09-24",
@@ -439,8 +419,8 @@
   },
   {
    "date": "2026-09-26",
-   "km": 12.4,
-   "level": 1
+   "km": 0.0,
+   "level": 0
   },
   {
    "date": "2026-09-27",
@@ -449,6 +429,26 @@
   },
   {
    "date": "2026-09-28",
+   "km": 0.0,
+   "level": 0
+  },
+  {
+   "date": "2026-09-29",
+   "km": 0.0,
+   "level": 0
+  },
+  {
+   "date": "2026-09-30",
+   "km": 12.4,
+   "level": 1
+  },
+  {
+   "date": "2026-10-01",
+   "km": 0.0,
+   "level": 0
+  },
+  {
+   "date": "2026-10-02",
    "km": 0.0,
    "level": 0
   }
@@ -462,12 +462,12 @@
    "duration_hm": "4:00",
    "duration_s": 14400.0,
    "elevation_gain_m": 1500,
-   "end_time": "2026-08-29T12:00:00+00:00",
+   "end_time": "2026-09-02T12:00:00+00:00",
    "id": 3,
    "max_kmh": 148,
    "point_count": 180,
    "source": "trip_marker",
-   "start_time": "2026-08-29T12:00:00+00:00"
+   "start_time": "2026-09-02T12:00:00+00:00"
   },
   "fastest_top": {
    "avg_kmh": 65,
@@ -476,12 +476,12 @@
    "duration_hm": "4:00",
    "duration_s": 14400.0,
    "elevation_gain_m": 1500,
-   "end_time": "2026-08-29T12:00:00+00:00",
+   "end_time": "2026-09-02T12:00:00+00:00",
    "id": 3,
    "max_kmh": 148,
    "point_count": 180,
    "source": "trip_marker",
-   "start_time": "2026-08-29T12:00:00+00:00"
+   "start_time": "2026-09-02T12:00:00+00:00"
   },
   "longest": {
    "avg_kmh": 65,
@@ -490,12 +490,12 @@
    "duration_hm": "4:00",
    "duration_s": 14400.0,
    "elevation_gain_m": 1500,
-   "end_time": "2026-08-29T12:00:00+00:00",
+   "end_time": "2026-09-02T12:00:00+00:00",
    "id": 3,
    "max_kmh": 148,
    "point_count": 180,
    "source": "trip_marker",
-   "start_time": "2026-08-29T12:00:00+00:00"
+   "start_time": "2026-09-02T12:00:00+00:00"
   },
   "longest_time": {
    "avg_kmh": 65,
@@ -504,12 +504,12 @@
    "duration_hm": "4:00",
    "duration_s": 14400.0,
    "elevation_gain_m": 1500,
-   "end_time": "2026-08-29T12:00:00+00:00",
+   "end_time": "2026-09-02T12:00:00+00:00",
    "id": 3,
    "max_kmh": 148,
    "point_count": 180,
    "source": "trip_marker",
-   "start_time": "2026-08-29T12:00:00+00:00"
+   "start_time": "2026-09-02T12:00:00+00:00"
   },
   "most_climb": {
    "avg_kmh": 65,
@@ -518,12 +518,12 @@
    "duration_hm": "4:00",
    "duration_s": 14400.0,
    "elevation_gain_m": 1500,
-   "end_time": "2026-08-29T12:00:00+00:00",
+   "end_time": "2026-09-02T12:00:00+00:00",
    "id": 3,
    "max_kmh": 148,
    "point_count": 180,
    "source": "trip_marker",
-   "start_time": "2026-08-29T12:00:00+00:00"
+   "start_time": "2026-09-02T12:00:00+00:00"
   }
  },
  "ride_count": 3,
@@ -531,15 +531,15 @@
  "weekly": [
   {
    "km": 260.3,
-   "week": "2026-W34"
+   "week": "2026-W35"
   },
   {
    "km": 88.0,
-   "week": "2026-W37"
+   "week": "2026-W38"
   },
   {
    "km": 12.4,
-   "week": "2026-W38"
+   "week": "2026-W39"
   }
  ]
 }
