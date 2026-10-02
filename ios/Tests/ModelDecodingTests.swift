@@ -76,6 +76,44 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(settings.detection.staleTripMinutes, 60)
     }
 
+    func testTrack() throws {
+        let track: TrackResponse = try load("api_track")
+        XCTAssertEqual(track.points.count, 64)
+        XCTAssertEqual(track.pointCount, 64)
+        XCTAssertEqual(track.points[0].t, 0)
+        XCTAssertEqual(track.points[0].altitude, 410)
+        XCTAssertEqual(track.durationS, 164)
+        XCTAssertEqual(track.distanceM, 1260)
+        XCTAssertEqual(track.points.last?.dist, 1260)
+        XCTAssertEqual(track.maxSpeed?.kmh, 50)                                     // 14 m/s
+        XCTAssertEqual(track.stops.count, 2)
+        XCTAssertEqual(track.stops[0].durationS, 22)
+        XCTAssertEqual(track.stops[1].tStart, 94)
+        XCTAssertEqual(track.stops[0].stopKind, .unknown)
+        XCTAssertEqual(track.stoppedS, 62)
+        XCTAssertEqual(track.ride.distanceKm, 88.0)
+        XCTAssertEqual(track.points.map(\.t), track.points.map(\.t).sorted())
+    }
+
+    func testTrackPointsDecodeFromTheCompactArrays() throws {
+        let with = try JSONDecoder().decode(TrackPoint.self, from: Data("[12.5,47.1,8.2,5.5,410,100]".utf8))
+        XCTAssertEqual(with, TrackPoint(t: 12.5, lat: 47.1, lon: 8.2, mps: 5.5, altitude: 410, dist: 100))
+        let without = try JSONDecoder().decode(TrackPoint.self, from: Data("[12.5,47.1,8.2,5.5,null,100]".utf8))
+        XCTAssertNil(without.altitude)
+        XCTAssertEqual(without.dist, 100)                                           // the element after a null is still read correctly
+        XCTAssertEqual(with.kmh, 19.8, accuracy: 1e-9)
+        XCTAssertThrowsError(try JSONDecoder().decode(TrackPoint.self, from: Data("[1,2,3]".utf8)))
+    }
+
+    func testAnEmptyTrackDecodes() throws {
+        let json = #"{"api":1,"ride":{"id":1,"start_time":"2026-09-30T08:00:00+00:00","end_time":"2026-09-30T08:10:00+00:00","distance_m":1000,"distance_km":1.0,"duration_s":600,"duration_hm":"0:10","avg_kmh":6,"max_kmh":9,"elevation_gain_m":0,"point_count":0,"source":"trip_marker"},"start":null,"duration_s":0,"distance_m":0,"points":[],"max_speed":null,"stops":[],"stopped_s":0,"point_count":0}"#
+        let track = try JSONDecoder.ridelog.decode(TrackResponse.self, from: Data(json.utf8))
+        XCTAssertTrue(track.points.isEmpty)
+        XCTAssertNil(track.maxSpeed)
+        XCTAssertNil(track.start)
+        XCTAssertNil(track.featuresStatus)
+    }
+
     func testDeleteResponse() throws {
         let json = #"{"api":1,"deleted":42}"#
         XCTAssertEqual(try JSONDecoder.ridelog.decode(DeleteResponse.self, from: Data(json.utf8)).deleted, 42)

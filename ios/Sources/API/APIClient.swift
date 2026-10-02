@@ -9,6 +9,8 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized: return "You've been signed out."
+        case .server(let code) where code == 404 || code == 405:
+            return "The server doesn't know this request (\(code)). If the app was just updated, the server needs the update and a restart too."
         case .server(let code): return "The server answered with an error (\(code))."
         case .offline: return "Can't reach the server. Check your connection and try again."
         case .decoding: return "The server sent something the app didn't understand. Updating the app may help."

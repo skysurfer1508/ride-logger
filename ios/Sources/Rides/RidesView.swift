@@ -228,8 +228,9 @@ struct RideDetailView: View {
     @State private var errorText: String?
 
     var body: some View {
-        LoaderScreen(api: api, path: "rides/\(ride.id)") { (detail: RideDetailResponse) in
-            RideDetailContent(ride: detail.ride, polyline: detail.polyline)
+        LoaderScreen(api: api, path: "rides/\(ride.id)/track") { (track: TrackResponse) in
+            // .id: after a pull-to-refresh with a different answer the screen rebuilds its model instead of showing the old track
+            RideTrackContent(track: track).id("\(track.pointCount)-\(track.stops.count)-\(Int(track.distanceM))-\(track.featuresStatus ?? "")")
         }
         .navigationTitle(Format.shortDay(iso: ride.startTime))
         .navigationBarTitleDisplayMode(.inline)
@@ -266,43 +267,6 @@ struct RideDetailView: View {
             // AuthService takes over
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
-        }
-    }
-}
-
-struct RideDetailContent: View {
-    let ride: RideSummary
-    let polyline: [[Double]]
-
-    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
-
-    var body: some View {
-        VStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Format.day(iso: ride.startTime)).font(.headline).foregroundStyle(Theme.text)
-                Text("\(Format.time(iso: ride.startTime)) – \(Format.time(iso: ride.endTime))").font(.subheadline).foregroundStyle(Theme.muted)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Panel {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
-                    StatTile(value: String(format: "%.1f", ride.distanceKm), unit: "km", label: "Distance")
-                    StatTile(value: ride.durationHm, label: "Duration")
-                    StatTile(value: "\(ride.avgKmh)", unit: "km/h", label: "Avg speed")
-                    StatTile(value: "\(ride.maxKmh)", unit: "km/h", label: "Max speed")
-                    StatTile(value: "\(ride.elevationGainM)", unit: "m", label: "Elevation gain")
-                    StatTile(value: "\(ride.pointCount)", label: ride.source == "trip_marker" ? "Points · trip" : "Points · inferred")
-                }
-            }
-
-            if polyline.coordinates.isEmpty {
-                Text("This ride has no route.").foregroundStyle(Theme.muted)
-            } else {
-                RouteMap(routes: [polyline.coordinates], showEndpoints: true)
-                    .frame(height: 380)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border, lineWidth: 1))
-            }
         }
     }
 }

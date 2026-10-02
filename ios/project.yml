@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.2"
-    CURRENT_PROJECT_VERSION: "3"
+    MARKETING_VERSION: "1.3"
+    CURRENT_PROJECT_VERSION: "4"
 targets:
   RideLog:
     type: application
@@ -83,6 +83,8 @@ targets:
       - Sources/Core/Format.swift
       - Sources/Core/RideFilters.swift
       - Sources/API/Models.swift
+      - Sources/API/TrackModels.swift
+      - Sources/Core/TrackMath.swift
       - Sources/API/ResponseCache.swift
       - Sources/Recording/RecordingLogic.swift
       - Sources/Recording/IngestPayload.swift

@@ -57,6 +57,9 @@ enum Format {
         parseISO(iso).map { timeFormatter.string(from: $0) } ?? ""
     }
 
+    /// The time of day of a moment: "14:03".
+    static func time(_ date: Date) -> String { timeFormatter.string(from: date) }
+
     /// 5.0 -> "5:00", 3725 -> "1:02:05". The ride timer and the HUD.
     static func clock(seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded(.down)))
