@@ -141,6 +141,7 @@ extension TrafficModel {
 
 struct TrafficView: View {
     let api: APIClient
+    @ObservedObject var activeRoute: ActiveRouteModel
     @StateObject private var model: TrafficModel
     @StateObject private var location = LocationAccess()
     @AppStorage("traffic.colours") private var showColours = true
@@ -155,10 +156,12 @@ struct TrafficView: View {
     @State private var selectedIncident: TrafficIncident?
     @State private var selectedWebcam: TrafficWebcam?
     @State private var selectedRoad: TwistyRoad?
+    @State private var showPlanner = false
     @State private var hint: String?
 
-    init(api: APIClient) {
+    init(api: APIClient, activeRoute: ActiveRouteModel) {
         self.api = api
+        self.activeRoute = activeRoute
         _model = StateObject(wrappedValue: TrafficModel(api: api))
     }
 
@@ -175,6 +178,10 @@ struct TrafficView: View {
             .navigationTitle("Traffic")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showPlanner = true } label: { Label("Plan", systemImage: "map.fill") }
+                        .accessibilityLabel("Plan a loop or a route")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { Task { await refresh(force: true) } } label: { Image(systemName: "arrow.clockwise") }
                         .disabled(model.loading)
@@ -194,6 +201,9 @@ struct TrafficView: View {
             .onDisappear { model.stopRoadsRetry() }
             .sheet(item: $selectedIncident) { incident in IncidentSheet(incident: incident).presentationDetents([.medium]) }
             .sheet(item: $selectedWebcam) { webcam in WebcamSheet(webcam: webcam).presentationDetents([.medium, .large]) }
+            .sheet(isPresented: $showPlanner) {
+                PlannerView(api: api, start: visible?.center ?? CLLocationCoordinate2D(latitude: 47.3769, longitude: 8.5417), activeRoute: activeRoute)
+            }
             .sheet(item: $selectedRoad) { road in RoadSheet(road: road, attribution: model.roads?.attribution ?? "").presentationDetents([.medium]) }
             .alert("Not set up", isPresented: Binding(get: { hint != nil }, set: { if !$0 { hint = nil } })) {
                 Button("OK", role: .cancel) {}
@@ -208,6 +218,9 @@ struct TrafficView: View {
     private var map: some View {
         Map(position: $camera) {
             UserAnnotation()
+            if activeRoute.coordinates.count > 1 {
+                MapPolyline(coordinates: activeRoute.coordinates).stroke(Color(hex: 0x3478F6), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+            }
             if showRoads {
                 ForEach(shownRoads) { road in
                     let line = road.geometry.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
@@ -319,6 +332,7 @@ struct TrafficView: View {
                 lines.append(line)
             }
         }
+        if let route = activeRoute.route { lines.append("Following \"\(route.name)\" (blue line). Plan > Stop following to clear it.") }
         if showRoads {
             if model.roadsTooWide {
                 lines.append("Roads: zoom in to see twisty roads.")

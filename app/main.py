@@ -9,7 +9,7 @@ from .auth import NotAuthenticated, OnboardingRequired
 from .config import settings
 from .db import init_db
 from .paths import STATIC_DIR
-from .routers import api_garage, api_roads, api_v1, auth, dashboard, ingest, native_auth
+from .routers import api_garage, api_planner, api_roads, api_v1, auth, dashboard, ingest, native_auth
 
 
 @asynccontextmanager
@@ -51,4 +51,5 @@ app.include_router(native_auth.router)
 app.include_router(api_v1.router)
 app.include_router(api_garage.router)
 app.include_router(api_roads.router)
+app.include_router(api_planner.router)
 app.include_router(dashboard.router)

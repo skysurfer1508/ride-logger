@@ -4,15 +4,16 @@ import SwiftUI
 struct RecordView: View {
     @ObservedObject var recorder: RideRecorder
     @ObservedObject var uploader: RideUploader
+    @ObservedObject var activeRoute: ActiveRouteModel
     @State private var confirmStop = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if recorder.isRecording {
-                    RecordingDashboard(recorder: recorder, uploader: uploader, confirmStop: $confirmStop)
+                    RecordingDashboard(recorder: recorder, uploader: uploader, activeRoute: activeRoute, confirmStop: $confirmStop)
                 } else {
-                    IdleView(recorder: recorder, uploader: uploader)
+                    IdleView(recorder: recorder, uploader: uploader, activeRoute: activeRoute)
                 }
             }
             .background(Theme.bg.ignoresSafeArea())
@@ -41,6 +42,7 @@ struct RecordView: View {
 private struct IdleView: View {
     @ObservedObject var recorder: RideRecorder
     @ObservedObject var uploader: RideUploader
+    @ObservedObject var activeRoute: ActiveRouteModel
 
     var body: some View {
         ScrollView {
@@ -48,6 +50,7 @@ private struct IdleView: View {
                 if let record = recorder.interrupted { interruptedCard(record) }
                 if let summary = recorder.summary { SummaryCard(summary: summary) { recorder.dismissSummary() } }
                 permissionCards
+                if let route = activeRoute.route { RouteReadyCard(route: route) { activeRoute.clear() } }
 
                 Button {
                     recorder.start()
@@ -182,6 +185,7 @@ struct UploadStatus: View {
 private struct RecordingDashboard: View {
     @ObservedObject var recorder: RideRecorder
     @ObservedObject var uploader: RideUploader
+    @ObservedObject var activeRoute: ActiveRouteModel
     @Binding var confirmStop: Bool
 
     var body: some View {
@@ -216,7 +220,9 @@ private struct RecordingDashboard: View {
                 StatTile(value: "\(Format.kmh(fromMps: recorder.stats.maxSpeedMps))", unit: "km/h", label: "Top")
             }
 
-            LiveMap(route: recorder.route)
+            if activeRoute.route != nil { FollowCard(activeRoute: activeRoute, latest: recorder.latest) }
+
+            LiveMap(route: recorder.route, planned: activeRoute.coordinates)
                 .frame(minHeight: 180)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border, lineWidth: 1))
@@ -272,15 +278,70 @@ private struct GPSChip: View {
 /// The route so far, following the bike.
 private struct LiveMap: View {
     let route: [CLLocationCoordinate2D]
+    var planned: [CLLocationCoordinate2D] = []
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
 
     var body: some View {
         Map(position: $camera, interactionModes: []) {
             UserAnnotation()
+            if planned.count > 1 {
+                MapPolyline(coordinates: planned).stroke(Color(hex: 0x3478F6).opacity(0.8), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+            }
             if route.count > 1 {
                 MapPolyline(coordinates: route).stroke(Theme.accent, lineWidth: 4)
             }
         }
         .mapStyle(.standard(elevation: .flat))
+    }
+}
+
+/// A planned route is set but the ride has not started.
+private struct RouteReadyCard: View {
+    let route: ActiveRoute
+    let clear: () -> Void
+
+    var body: some View {
+        Panel(title: "Route ready") {
+            Text(route.name).font(.headline).foregroundStyle(Theme.text)
+            Text("\(PlannerLogic.kmText(route.distanceKm)). Start the ride and this shows how far along you are and how far off the line, in blue on the map. No turn-by-turn.")
+                .font(.footnote).foregroundStyle(Theme.muted)
+            Button("Clear route", role: .destructive, action: clear).buttonStyle(.bordered)
+        }
+    }
+}
+
+/// How far along the planned route the rider is, and how far off its line. Distances only.
+private struct FollowCard: View {
+    @ObservedObject var activeRoute: ActiveRouteModel
+    let latest: LocationSample?
+
+    var body: some View {
+        if let route = activeRoute.route {
+            let progress = latest.flatMap { activeRoute.progress(lat: $0.latitude, lon: $0.longitude) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "location.north.line.fill").foregroundStyle(Color(hex: 0x3478F6))
+                    Text(route.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                    Spacer()
+                    if let progress {
+                        Text(PlannerLogic.offRouteText(progress)).font(.caption.weight(.bold)).foregroundStyle(progress.isOffRoute ? Theme.accent : Theme.success)
+                    } else {
+                        Text("Waiting for GPS").font(.caption).foregroundStyle(Theme.muted)
+                    }
+                }
+                if let progress {
+                    ProgressView(value: progress.fraction).tint(progress.isOffRoute ? Theme.accent : Color(hex: 0x3478F6))
+                    HStack {
+                        Text(PlannerLogic.progressText(progress, totalKm: route.distanceKm)).font(.caption).foregroundStyle(Theme.muted)
+                        Spacer()
+                        Text("\(PlannerLogic.kmText(progress.remainingM / 1000)) to go").font(.caption).foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border, lineWidth: 1))
+            .accessibilityElement(children: .combine)
+        }
     }
 }

@@ -14,6 +14,7 @@ TIMEOUT_S = 120.0
 CHUNK_POINTS = 1500
 CHUNK_OVERLAP = 25            # points repeated at the start of the next chunk so the matcher has context; the earlier chunk's answer is kept for them
 NO_MATCH_CODES = {171, 442, 443}
+NO_ROUTE_CODES = {171, 442, 443, 444}
 
 
 class ValhallaUnavailable(Exception):
@@ -127,3 +128,61 @@ def match_points(points: Sequence[tuple[float, float]]) -> list[Optional[dict]]:
         for i in range(keep_from, end):
             result[i] = matched[i - start]
     return result
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------- routing --
+
+class NoRoute(Exception):
+    """Valhalla found no way between the points (or one of them is not near a suitable road)."""
+
+
+def decode_polyline6(encoded: str) -> list[tuple[float, float]]:
+    """Valhalla's encoded line (Google's polyline algorithm at 1e-6 degrees) as (lat, lon) pairs."""
+    coords: list[tuple[float, float]] = []
+    index = lat = lon = 0
+    while index < len(encoded):
+        for axis in (0, 1):
+            shift = result = 0
+            while True:
+                byte = ord(encoded[index]) - 63
+                index += 1
+                result |= (byte & 0x1F) << shift
+                shift += 5
+                if byte < 0x20:
+                    break
+            delta = ~(result >> 1) if result & 1 else result >> 1
+            if axis == 0:
+                lat += delta
+            else:
+                lon += delta
+        coords.append((lat / 1e6, lon / 1e6))
+    return coords
+
+
+def route(locations: Sequence[dict], avoid_motorways: bool = True, paved_only: bool = True) -> dict:
+    """A motorcycle route through the locations ({"lat", "lon", optional "type": "break" | "through"}, in order).
+    Returns {"distance_m", "duration_s", "shape": [(lat, lon), ...]}. Raises NoRoute, or ValhallaUnavailable when the service is off or down."""
+    if not configured():
+        raise ValhallaUnavailable("The map service is switched off.")
+    options: dict = {"use_trails": 0.0, "use_ferry": 0.0}
+    if avoid_motorways:
+        options.update({"exclude_highways": True, "exclude_tolls": True})
+    if paved_only:
+        options["exclude_unpaved"] = True
+    try:
+        answer = _post("/route", {"locations": list(locations), "costing": "motorcycle", "costing_options": {"motorcycle": options}, "directions_type": "none"})
+    except NoMatch as e:                                    # _post reads error codes 171/442/443 as "no match": for a route that means "no way"
+        raise NoRoute(str(e)) from e
+    except ValhallaUnavailable as e:
+        if "(400)" in str(e):
+            raise NoRoute("The map service could not find a way between those points.") from e
+        raise
+    trip = answer.get("trip") or {}
+    shape: list[tuple[float, float]] = []
+    for leg in trip.get("legs", []):
+        part = decode_polyline6(leg.get("shape", ""))
+        shape.extend(part[1:] if shape and part else part)
+    summary = trip.get("summary") or {}
+    if len(shape) < 2:
+        raise NoRoute("The map service returned an empty route.")
+    return {"distance_m": float(summary.get("length", 0.0)) * 1000.0, "duration_s": float(summary.get("time", 0.0)), "shape": shape}

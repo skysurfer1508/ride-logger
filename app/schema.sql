@@ -171,3 +171,18 @@ CREATE TABLE IF NOT EXISTS ride_ways (
 );
 CREATE INDEX IF NOT EXISTS idx_ride_ways_way ON ride_ways(way_id);
 CREATE INDEX IF NOT EXISTS idx_ride_ways_ride ON ride_ways(ride_id);
+
+-- Routes the person planned in the app (a loop or an A-to-B route) and chose to keep. The line is stored as JSON [[lat, lon], ...].
+CREATE TABLE IF NOT EXISTS planned_routes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_sub TEXT NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  distance_m REAL NOT NULL,
+  duration_s REAL NOT NULL,
+  twisty_m REAL NOT NULL,
+  twistiness INTEGER NOT NULL,
+  shape TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_planned_routes_owner ON planned_routes(owner_sub);

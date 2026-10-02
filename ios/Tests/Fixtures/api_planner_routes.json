@@ -1,0 +1,15 @@
+{
+ "api": 1,
+ "routes": [
+  {
+   "created_at": "2026-10-02 19:36:58",
+   "distance_km": 1.6,
+   "duration_min": 60,
+   "id": 1,
+   "kind": "loop",
+   "name": "Sunday loop",
+   "twistiness": 68,
+   "twisty_km": 1.1
+  }
+ ]
+}

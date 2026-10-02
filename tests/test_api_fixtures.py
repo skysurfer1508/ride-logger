@@ -34,6 +34,9 @@ ENDPOINTS = {
     "api_garage_bike": "/api/v1/garage/bikes/{bike_id}",
     "api_insights": "/api/v1/rides/{insights_ride_id}/insights",
     "api_roads": "/api/v1/roads?south=47.39&west=8.55&north=47.45&east=8.65&min_score=0",
+    "api_planner_loop": ("/api/v1/planner/loop", {"lat": 47.3769, "lon": 8.5417, "distance_km": 60}),
+    "api_planner_routes": "/api/v1/planner/routes",
+    "api_planner_route": "/api/v1/planner/routes/{route_id}",
     "api_traffic_config": "/api/v1/traffic/config",
     "api_traffic_incidents": "/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25",
     "api_traffic_webcams": "/api/v1/traffic/webcams?lat=47.3769&lon=8.5417&radius_km=15",
@@ -125,10 +128,22 @@ def test_fixture_matches_the_live_api(name, alice, seeded, monkeypatch):
         insert_points(ALICE["sub"], insights_ride_id, rows)
     if name == "api_roads":
         _roads_for_fixture(seeded, monkeypatch)
-    path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1, insights_ride_id=insights_ride_id)
+    route_id = None
+    if name.startswith("api_planner"):
+        route_id = _planner_for_fixture(alice, monkeypatch)
+    spec = ENDPOINTS[name]
+    if isinstance(spec, tuple):
+        response = alice.post(spec[0], data=spec[1], headers={"X-RideLog-Client": "1"})
+        assert response.status_code == 200
+        _check_or_write(name, response.json())
+        return
+    path = spec.format(ride_id=seeded[1], bike_id=1, insights_ride_id=insights_ride_id, route_id=route_id)
     response = alice.get(path)
     assert response.status_code == 200
-    actual = response.json()
+    _check_or_write(name, response.json())
+
+
+def _check_or_write(name, actual):
     target = FIXTURES / f"{name}.json"
     if os.environ.get("UPDATE_API_FIXTURES") == "1":
         FIXTURES.mkdir(parents=True, exist_ok=True)
@@ -160,3 +175,12 @@ def _roads_for_fixture(seeded, monkeypatch):
         db.commit()
     finally:
         db.close()
+
+
+def _planner_for_fixture(alice, monkeypatch):
+    """A routing service that joins the points with lines, and one saved route (returns its id)."""
+    from test_planner import FakeRouter, SHAPE
+    FakeRouter(monkeypatch)
+    saved = alice.post("/api/v1/planner/routes", data={"name": "Sunday loop", "kind": "loop", "shape": json.dumps(SHAPE), "duration_s": 3600}, headers={"X-RideLog-Client": "1"})
+    assert saved.status_code == 200
+    return saved.json()["route"]["id"]

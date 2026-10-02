@@ -10,6 +10,8 @@ final class AppServices {
     let api: APIClient
     let recorder: RideRecorder
     let autoStart: AutoStartCoordinator
+    /// The planned route being followed, if any (shown on the Traffic and Record maps).
+    let activeRoute = ActiveRouteModel()
 
     private init() {
         let api = APIClient()

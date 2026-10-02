@@ -219,7 +219,26 @@ to Apple Maps).
   uses and writes `data/roads.db`, 25 MB; it is built beside the old file and swapped in at the end). `deploy/valhalla/refresh.sh` rebuilds it with the monthly
   map. `python -m app.cli match-rides` works out the roads of every ride right away instead of waiting for the app. Without the file the layer says it has not
   been built. Restart the server after pulling this version (new endpoint).
-- Not here yet: planning a route (next release) and roads outside Switzerland.
+- Not here yet: roads outside Switzerland.
+
+## Plan a ride: loops through twisty roads, A to B, follow on the Record tab
+
+Traffic tab > **Plan** (top left). Pan the map to where you want to start first: the start is the middle of the map that was showing.
+
+- **Loop:** choose a length (20 to 400 km), whether to avoid motorways, to stay on paved roads, and whether to prefer roads you have not ridden, then *Find loops*.
+  Up to three different loops come back with length, time, how many km of them are twisty, and a score; pick one on the list or the map.
+  How it works (app/planner.py): waypoints go round a circle through the start, each moved onto the best twisty stretch of the Roads layer nearby and routed *along*
+  it (in one end, out the other); about 20 to 40 candidates are routed by Valhalla's motorcycle routing, each re-sized until its length is within 8% of what you
+  asked, then scored on twistiness (measured on the route's real shape), on how much of it goes back over road it has already used, on how close the length is, and
+  (if you ask) on how much is new to you. It takes 4 to 6 seconds. In a narrow valley there may be no other way back, and then the loop honestly says it
+  "goes back over 40% of its own road". Without the road database loops are still made, just not steered through twisty roads (it says so).
+- **A to B:** switch to *A to B* and tap the destination on the small map; one motorcycle route comes back (no twistiness steering: it is the normal route).
+- **Follow:** *Follow* makes it your active route: it is drawn in blue on the Traffic map and on the Record tab's map, and the Record tab shows how far along
+  you are, how many km to go, and "On the route" or "Off the route by 340 m". That is all: **no turn-by-turn, no voice, no rerouting**. The route is kept on the
+  phone, so it is still there after the app is closed. *Stop following* (in the Plan sheet) or *Clear route* (Record tab, before starting) removes it.
+- **Save / GPX:** *Save* keeps it on your server (up to 100 routes, listed in the Plan sheet to follow again or delete); *GPX* saves and opens the share sheet so you
+  can put the file on a Garmin, Komoot, Strava or Apple Files. The length is worked out on the server from the line.
+- Needs Valhalla running (see the limits section); the road database is optional. If the routing service is busy or down the sheet says so.
 
 ## GPX export and import
 
@@ -290,6 +309,15 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
 6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
 
+**Planner**
+1. Traffic tab, pan to your street, Plan > Loop 80 km > Find loops: after a few seconds up to three loops appear on the little map and in the list, each starting and
+   ending at your street. Are the lengths right? Do they use roads you would actually ride, or does one send you somewhere silly (motorway, farm track, closed pass)?
+   Tell Claude what is wrong and where.
+2. Tap another option: the bold blue line changes. Save one, then GPX: the share sheet opens; send it to yourself and open it in another app.
+3. Follow: open the Record tab: "Route ready". Start a short ride along the first kilometres: the card should say On the route, the km count goes up, and if you take a
+   different street it says Off the route by some metres and recovers when you rejoin. Check the blue line on the map is where the road is.
+4. A to B: tap a place 30 km away: a route comes back; Follow works the same.
+
 **Roads**
 1. Traffic tab > Roads: violet stretches with score badges appear near you (zoom in until the status line stops saying "zoom in"). Do the roads you know to be
    twisty show up, and are they among the best? Is a road you think is fun missing, or a boring one scored high? Tell Claude the road and where.
@@ -321,6 +349,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-A home-screen widget, Apple Watch, route planning (next), a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+A home-screen widget, Apple Watch (next), turn-by-turn navigation, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
 real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.

@@ -58,10 +58,10 @@ struct MainTabs: View {
             RidesView(api: api)
                 .tabItem { Label(AppTab.rides.title, systemImage: AppTab.rides.symbol) }
                 .tag(AppTab.rides)
-            RecordView(recorder: recorder, uploader: recorder.uploader)
+            RecordView(recorder: recorder, uploader: recorder.uploader, activeRoute: AppServices.shared.activeRoute)
                 .tabItem { Label(AppTab.record.title, systemImage: AppTab.record.symbol) }
                 .tag(AppTab.record)
-            TrafficView(api: api)
+            TrafficView(api: api, activeRoute: AppServices.shared.activeRoute)
                 .tabItem { Label(AppTab.traffic.title, systemImage: AppTab.traffic.symbol) }
                 .tag(AppTab.traffic)
             SettingsView(api: api, auth: auth, recorder: recorder, uploader: recorder.uploader, autoStart: AppServices.shared.autoStart)

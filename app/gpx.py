@@ -64,6 +64,19 @@ def build_gpx(rows: Sequence, name: str) -> bytes:
     return "\n".join(out).encode("utf-8")
 
 
+def build_route_gpx(name: str, points) -> bytes:
+    """GPX 1.1 for a planned route: a track with no times (there are none yet), which Garmin, Komoot, Strava and Apple Files all take. `points` are (lat, lon)."""
+    out = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<gpx version="1.1" creator="RideLog" xmlns="{GPX_NS}">',
+        f"<metadata><name>{escape(name)}</name></metadata>",
+        f"<trk><name>{escape(name)}</name><trkseg>",
+    ]
+    out += [f'<trkpt lat="{lat:.6f}" lon="{lon:.6f}"/>' for lat, lon in points]
+    out.append("</trkseg></trk></gpx>")
+    return "\n".join(out).encode("utf-8")
+
+
 # -------------------------------------------------------------------------------------------------------------------------------- import --
 
 def _local(tag) -> str:
