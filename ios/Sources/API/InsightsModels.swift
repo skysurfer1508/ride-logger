@@ -62,7 +62,8 @@ struct Smoothness: Decodable {
     let events: [SmoothnessEvent]
     let hardBraking: Int
     let hardAcceleration: Int
-    let eventsPer10km: Double
+    /// JSON key events_per_10km: Swift's snake_case decoder turns it into eventsPer10Km (it capitalises "10km" as "10Km"), so the name must be exactly this.
+    let eventsPer10Km: Double
     /// 0 to 100, higher is smoother.
     let score: Int
 }

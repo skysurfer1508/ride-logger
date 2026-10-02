@@ -193,7 +193,7 @@ struct SmoothnessPanel: View {
             HStack {
                 StatTile(value: "\(smoothness.hardBraking)", label: "Hard braking")
                 StatTile(value: "\(smoothness.hardAcceleration)", label: "Hard accel.")
-                StatTile(value: String(format: "%.1f", smoothness.eventsPer10km), unit: "/10 km", label: "Rate")
+                StatTile(value: String(format: "%.1f", smoothness.eventsPer10Km), unit: "/10 km", label: "Rate")
             }
             ForEach(smoothness.events.prefix(12)) { event in
                 Button { jump(event) } label: {

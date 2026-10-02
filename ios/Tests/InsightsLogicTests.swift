@@ -228,3 +228,18 @@ final class InsightsLogicTests: XCTestCase {
         XCTAssertEqual(InsightsLogic.forceChartLimit([]), 0.5)
     }
 }
+
+/// Swift's snake_case key decoding capitalises every word after an underscore, so "events_per_10km" is looked up as eventsPer10Km. A property named
+/// otherwise makes the whole answer undecodable (this once emptied the ride screen's insights panel).
+final class SnakeCaseKeyTests: XCTestCase {
+    func testAKeyWithDigitsIsMatchedTheWaySwiftSpellsIt() throws {
+        struct Sample: Decodable { let eventsPer10Km: Double }
+        let sample = try JSONDecoder.ridelog.decode(Sample.self, from: Data(#"{"events_per_10km": 2.4}"#.utf8))
+        XCTAssertEqual(sample.eventsPer10Km, 2.4)
+    }
+
+    func testTheRateIsReadFromTheServersSmoothnessAnswer() throws {
+        let json = #"{"events":[],"hard_braking":0,"hard_acceleration":0,"events_per_10km":3.5,"score":90}"#
+        XCTAssertEqual(try JSONDecoder.ridelog.decode(Smoothness.self, from: Data(json.utf8)).eventsPer10Km, 3.5)
+    }
+}
