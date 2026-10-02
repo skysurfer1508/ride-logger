@@ -33,6 +33,7 @@ ENDPOINTS = {
     "api_garage": "/api/v1/garage",
     "api_garage_bike": "/api/v1/garage/bikes/{bike_id}",
     "api_insights": "/api/v1/rides/{insights_ride_id}/insights",
+    "api_roads": "/api/v1/roads?south=47.39&west=8.55&north=47.45&east=8.65&min_score=0",
     "api_traffic_config": "/api/v1/traffic/config",
     "api_traffic_incidents": "/api/v1/traffic/incidents?lat=47.3769&lon=8.5417&radius_km=25",
     "api_traffic_webcams": "/api/v1/traffic/webcams?lat=47.3769&lon=8.5417&radius_km=15",
@@ -111,7 +112,7 @@ def seeded(alice, monkeypatch):
 
 
 @pytest.mark.parametrize("name", sorted(ENDPOINTS))
-def test_fixture_matches_the_live_api(name, alice, seeded):
+def test_fixture_matches_the_live_api(name, alice, seeded, monkeypatch):
     insights_ride_id = None
     if name == "api_insights":
         # 90 km/h (over the 80 limit) through a right-hander, then a hard stop and a hard getaway: a corner with its lean, a braking and an acceleration event.
@@ -122,6 +123,8 @@ def test_fixture_matches_the_live_api(name, alice, seeded):
             rows[i]["speed"] = 3.0
         rows[102]["speed"] = 22.0
         insert_points(ALICE["sub"], insights_ride_id, rows)
+    if name == "api_roads":
+        _roads_for_fixture(seeded, monkeypatch)
     path = ENDPOINTS[name].format(ride_id=seeded[1], bike_id=1, insights_ride_id=insights_ride_id)
     response = alice.get(path)
     assert response.status_code == 200
@@ -133,3 +136,27 @@ def test_fixture_matches_the_live_api(name, alice, seeded):
         return
     assert target.exists(), f"{target.name} is missing: run UPDATE_API_FIXTURES=1 python -m pytest tests/test_api_fixtures.py"
     assert shape(actual) == shape(json.loads(target.read_text())), f"{name}: the API's shape changed; update the Swift models, then the fixture"
+
+
+def _roads_for_fixture(seeded, monkeypatch):
+    """Two twisty ways near 47.40 / 47.41, 8.60: the app has ridden the first (matched points of a ride along it) and not the second."""
+    import tempfile
+    from app import extras, roads
+    from app.config import settings
+    from trackgen import road_coords
+    twisty = [("straight", 150)] + [("turn", 60, 70 if i % 2 else -70) for i in range(18)] + [("straight", 150)]
+    target = Path(tempfile.mkdtemp(prefix="roads-fixture-")) / "roads.db"
+    conn = roads.create(target)
+    first = road_coords(twisty, spacing=12, lat0=47.40, lon0=8.60)
+    roads.add_way(conn, 111, {"highway": "secondary", "name": "Kurvenstrasse", "ref": "7", "maxspeed": "80"}, first)
+    roads.add_way(conn, 333, {"highway": "tertiary", "name": "Passstrasse", "surface": "asphalt"}, road_coords(twisty, spacing=12, lat0=47.41, lon0=8.60))
+    roads.finish(conn, "fixture")
+    monkeypatch.setattr(settings, "roads_db_path", str(target))
+    db = get_db()
+    try:
+        db.executemany("INSERT INTO ride_ways (ride_id, way_id, lat, lon) VALUES (?, 111, ?, ?)", [(seeded[1], lat, lon) for lat, lon in first])
+        for ride_id in seeded:                                                  # every ride has had its roads worked out: nothing pending
+            db.execute("INSERT OR REPLACE INTO ride_extras (ride_id, kind, version, points, payload, fetched_at) VALUES (?, 'ways', ?, 0, '{}', 'now')", (ride_id, extras.CACHE_VERSION))
+        db.commit()
+    finally:
+        db.close()

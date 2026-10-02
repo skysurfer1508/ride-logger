@@ -152,6 +152,24 @@ def check_valhalla() -> None:
         print("NOT working:", e)
 
 
+def build_roads(pbf: str, out: str | None) -> None:
+    from pathlib import Path
+    from . import roads_build
+    roads_build.build(Path(pbf), Path(out) if out else None)
+
+
+def match_rides(owner_email: str | None) -> None:
+    """Works out which roads every ride went along (the Roads layer's "ridden"), for everyone or one account, without waiting for the app to ask."""
+    from . import extras
+    conn = get_db()
+    try:
+        owners = [r["owner_sub"] for r in conn.execute("SELECT DISTINCT owner_sub FROM rides").fetchall()]
+    finally:
+        conn.close()
+    for owner in owners:
+        print(f"{owner}: {extras.catch_up_ways(owner, limit=10**6)} rides matched")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ride Logger maintenance CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -160,6 +178,11 @@ def main() -> None:
     sub.add_parser("sweep", help="Finalize stale open trips / gap-inferred rides")
     sub.add_parser("check-traffic", help="Call the Traffic tab's data sources once and show what came back")
     sub.add_parser("check-valhalla", help="Check the map-matching service and the weather service once")
+    roads_p = sub.add_parser("build-roads", help="Build the twisty-road database from an OpenStreetMap extract (needs: pip install osmium)")
+    roads_p.add_argument("--pbf", required=True, help="e.g. /home/you/valhalla-data/switzerland-latest.osm.pbf")
+    roads_p.add_argument("--out", help="default: ROADS_DB_PATH")
+    match_p = sub.add_parser("match-rides", help="Work out which roads each ride went along (needs Valhalla running)")
+    match_p.add_argument("--email", help="not used yet: everyone's rides are done")
     claim_p = sub.add_parser("claim-legacy", help="Assign pre-multi-user data to an account")
     claim_p.add_argument("email", help="Email of the account to assign legacy data to")
     args = parser.parse_args()
@@ -170,6 +193,10 @@ def main() -> None:
         sweep()
     elif args.command == "check-traffic":
         check_traffic()
+    elif args.command == "build-roads":
+        build_roads(args.pbf, args.out)
+    elif args.command == "match-rides":
+        match_rides(args.email)
     elif args.command == "check-valhalla":
         check_valhalla()
     elif args.command == "claim-legacy":

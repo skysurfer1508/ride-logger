@@ -198,6 +198,29 @@ map, so a slow service never delays the ride; each one says in words when its pa
 timer next to it) rebuild with a newer map. If Valhalla is down, rides still open; the limits panel says so. Results are cached per ride in the database
 (`ride_extras`); a ride that gets more points is looked up again.
 
+## Roads: twisty roads you have not ridden yet
+
+Traffic tab > the **Roads** chip. The map shows the twisty stretches of road in view (primary, secondary, tertiary and unclassified roads, 0.4 to 1.5 km each,
+no motorways, tunnels, private or unpaved roads) in violet, a badge with each one's twistiness score. **New** (next to the chip) hides what you have already ridden.
+Ridden stretches are faded with a tick; tap a badge for the details (score, length, how much of it is bendy, class, surface, the limit on the map, and a link
+to Apple Maps).
+
+- **Twistiness** is worked out from the shape of the road only (app/curvature.py): the road is sampled every 30 m, the radius of the bend at each sample is
+  measured, and tight and medium bends count towards the score while gentle sweepers count a little and anything over 400 m radius not at all. 0 is a straight
+  road and 100 is bend after bend. The list is ordered by how much *bendy road* there is, so a 1.5 km pass comes before a 300 m piece with one hairpin. Checked
+  against the real Swiss map: the Klausen, Susten, Julier and Gotthard roads come out at 60 to 90, central Zurich at 25 to 45. It knows nothing about surface
+  condition, traffic, cameras or winter closures, and OpenStreetMap has to hold the bends finely enough (a bend drawn with a point every 40 m is read as a polygon).
+- **Ridden** comes from your own rides: each ride is matched to roads by the same Valhalla service as the speed limits, and a stretch counts as ridden when at
+  least half of it has a point of one of your rides within 40 m on the same OpenStreetMap road. Rides you have never opened are matched in the background the
+  first time you open the layer ("working out which you have ridden..."; a few seconds), and every new ride is matched when you open it. Nobody else's rides count.
+  Without Valhalla the roads still show, just without ridden / not ridden.
+- **Server setup (once):** `.venv/bin/pip install osmium`, then
+  `.venv/bin/python -m app.cli build-roads --pbf /home/skysurfer1508/valhalla-data/switzerland-latest.osm.pbf` (about a minute, reads the same map file Valhalla
+  uses and writes `data/roads.db`, 25 MB; it is built beside the old file and swapped in at the end). `deploy/valhalla/refresh.sh` rebuilds it with the monthly
+  map. `python -m app.cli match-rides` works out the roads of every ride right away instead of waiting for the app. Without the file the layer says it has not
+  been built. Restart the server after pulling this version (new endpoint).
+- Not here yet: planning a route (next release) and roads outside Switzerland.
+
 ## GPX export and import
 
 - **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple
@@ -267,6 +290,13 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
 6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
 
+**Roads**
+1. Traffic tab > Roads: violet stretches with score badges appear near you (zoom in until the status line stops saying "zoom in"). Do the roads you know to be
+   twisty show up, and are they among the best? Is a road you think is fun missing, or a boring one scored high? Tell Claude the road and where.
+2. A few seconds after the first look the status line should say how many are "not ridden yet": are roads you rode recently faded with a tick? Tap **New**: only
+   the ones you have not ridden stay.
+3. Tap a badge: the sheet shows the details; "Show in Apple Maps" opens the middle of the road.
+
 **Ride insights**
 1. Open a ride: after a moment a weather panel appears (right day, right place? temperatures believable?). Airplane mode: the ride still opens, the panels explain why they are empty.
 2. Speed against the limit: are the stretches you remember going fast pink on the map, with the right limit in the list? Is a stretch listed where you were not over (or a 50 zone shown that was really 30)?
@@ -291,6 +321,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-Automatic start and stop (next), a home-screen widget, Apple Watch, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+A home-screen widget, Apple Watch, route planning (next), a Stop button on the Lock Screen banner, deleting from the website, naming rides,
 real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.

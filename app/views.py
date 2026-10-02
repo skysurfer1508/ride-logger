@@ -236,6 +236,7 @@ def delete_ride(conn: sqlite3.Connection, owner_sub: str, ride_id: int) -> bool:
         (owner_sub, ride["id"], ride["trip_id"]),
     )
     conn.execute("DELETE FROM ride_extras WHERE ride_id = ?", (ride["id"],))
+    conn.execute("DELETE FROM ride_ways WHERE ride_id = ?", (ride["id"],))
     conn.execute("DELETE FROM rides WHERE id = ? AND owner_sub = ?", (ride["id"], owner_sub))
     conn.commit()
     return True

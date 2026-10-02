@@ -25,13 +25,16 @@ class Settings(BaseSettings):
     # The public Overpass servers ask for an identifying User-Agent: put a contact in it, e.g. "ride-logger/1.0 (you@example.com)".
     osm_user_agent: str = "ride-logger/1.0 (self-hosted)"
 
+    # Map matching and routing (deploy/valhalla). Empty switches the speed-limit check and the route planner off.
+    valhalla_url: str = "http://127.0.0.1:8002"
+    weather_enabled: bool = True          # Open-Meteo, no key. False sends no ride position anywhere
+    # Twisty-road database for the Roads layer (built by `python -m app.cli build-roads`, see ios/README.md). Missing file: the layer says so.
+    roads_db_path: str = "./data/roads.db"
+
     # The app's Traffic tab. Both are optional and free; leave a key empty to switch that layer off (the app then says how to set it up).
     # Apple's own live traffic colours on the map need no key at all (MapKit draws them on the phone).
     #   opentransportdata_api_key: official Swiss traffic situations (accidents, congestion, roadworks), from https://api-manager.opentransportdata.swiss
     #   windy_api_key: public webcams near a spot, from https://api.windy.com/keys
-    # Map matching and routing (deploy/valhalla). Empty switches the speed-limit check and the route planner off.
-    valhalla_url: str = "http://127.0.0.1:8002"
-    weather_enabled: bool = True          # Open-Meteo, no key. False sends no ride position anywhere
     opentransportdata_api_key: str = ""
     windy_api_key: str = ""
 

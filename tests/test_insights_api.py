@@ -134,11 +134,13 @@ def test_deleting_a_ride_removes_its_cached_answers(alice, fakes):
     rid = ride_with_points()
     alice.get(f"/api/v1/rides/{rid}/insights")
     conn = get_db()
-    assert conn.execute("SELECT COUNT(*) FROM ride_extras WHERE ride_id = ?", (rid,)).fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM ride_extras WHERE ride_id = ?", (rid,)).fetchone()[0] == 3            # the match, the weather, and "roads worked out"
+    assert conn.execute("SELECT COUNT(*) FROM ride_ways WHERE ride_id = ?", (rid,)).fetchone()[0] > 0
     conn.close()
     assert alice.delete(f"/api/v1/rides/{rid}", headers={"X-RideLog-Client": "1"}).status_code == 200
     conn = get_db()
     assert conn.execute("SELECT COUNT(*) FROM ride_extras WHERE ride_id = ?", (rid,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM ride_ways WHERE ride_id = ?", (rid,)).fetchone()[0] == 0
     conn.close()
 
 

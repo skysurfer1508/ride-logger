@@ -160,3 +160,14 @@ CREATE TABLE IF NOT EXISTS ride_extras (
   fetched_at TEXT NOT NULL,
   PRIMARY KEY (ride_id, kind)
 );
+
+-- Which OpenStreetMap roads a ride went along: the matched points of the ride, thinned to one about every 40 m per road. It is what the Roads layer uses to
+-- say "ridden / not ridden yet". Filled when a ride is matched (opening its insights, or the background catch-up in routes/api_roads.py).
+CREATE TABLE IF NOT EXISTS ride_ways (
+  ride_id INTEGER NOT NULL,
+  way_id INTEGER NOT NULL,
+  lat REAL NOT NULL,
+  lon REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ride_ways_way ON ride_ways(way_id);
+CREATE INDEX IF NOT EXISTS idx_ride_ways_ride ON ride_ways(ride_id);

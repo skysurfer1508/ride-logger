@@ -36,10 +36,16 @@ final class TrafficModel: ObservableObject {
     @Published private(set) var webcamsError: String?
     @Published private(set) var loading = false
     @Published private(set) var configError: String?
+    @Published fileprivate(set) var roads: RoadsResponse?
+    @Published fileprivate(set) var roadsError: String?
+    @Published fileprivate(set) var roadsTooWide = false
 
-    private let api: APIClient
+    fileprivate let api: APIClient
     private var lastIncidents: TrafficLogic.Query?
     private var lastWebcams: TrafficLogic.Query?
+    fileprivate var lastRoads: RoadsLogic.Fetched?
+    fileprivate var roadsRetries = 0
+    fileprivate var roadsRetry: Task<Void, Never>?
 
     init(api: APIClient) { self.api = api }
 
@@ -89,6 +95,50 @@ final class TrafficModel: ObservableObject {
     }
 }
 
+extension TrafficModel {
+    /// The twisty roads in (and a margin around) the visible map. While the server is still working out which of them you have ridden it says so, and
+    /// this asks again a few seconds later, a handful of times.
+    func refreshRoads(visible: RoadsLogic.Box, force: Bool) async {
+        guard RoadsLogic.canQuery(visible) else {
+            roadsTooWide = true
+            return
+        }
+        roadsTooWide = false
+        let now = Date()
+        guard force || RoadsLogic.needsRefresh(last: lastRoads, visible: visible, now: now) else { return }
+        let box = RoadsLogic.queryBox(for: visible)
+        let query = ["south": String(format: "%.4f", box.south), "west": String(format: "%.4f", box.west), "north": String(format: "%.4f", box.north),
+                     "east": String(format: "%.4f", box.east), "limit": "100", "min_score": "35", "paved_only": "true"]
+        do {
+            let result: RoadsResponse = try await api.get("roads", query: query)
+            roads = result
+            roadsError = nil
+            lastRoads = RoadsLogic.Fetched(box: box, at: now)
+            if result.riddenStatus == "updating", roadsRetries < 5 {
+                roadsRetries += 1
+                roadsRetry?.cancel()
+                roadsRetry = Task { [weak self] in
+                    try? await Task.sleep(nanoseconds: 6_000_000_000)
+                    guard !Task.isCancelled, let self else { return }
+                    await self.refreshRoads(visible: visible, force: true)
+                }
+            } else if result.riddenStatus != "updating" {
+                roadsRetries = 0
+            }
+        } catch APIError.unauthorized {
+            // AuthService takes over
+        } catch {
+            roadsError = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
+        }
+    }
+
+    func stopRoadsRetry() {
+        roadsRetry?.cancel()
+        roadsRetry = nil
+        roadsRetries = 0
+    }
+}
+
 struct TrafficView: View {
     let api: APIClient
     @StateObject private var model: TrafficModel
@@ -97,11 +147,14 @@ struct TrafficView: View {
     @AppStorage("traffic.incidents") private var showIncidents = true
     @AppStorage("traffic.webcams") private var showWebcams = true
     @AppStorage("traffic.works") private var showWorks = false
+    @AppStorage("traffic.roads") private var showRoads = false
+    @AppStorage("traffic.roads.unridden") private var onlyUnridden = false
     @State private var camera: MapCameraPosition = .userLocation(fallback: .region(
         MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 47.3769, longitude: 8.5417), span: MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12))))
     @State private var visible: MKCoordinateRegion?
     @State private var selectedIncident: TrafficIncident?
     @State private var selectedWebcam: TrafficWebcam?
+    @State private var selectedRoad: TwistyRoad?
     @State private var hint: String?
 
     init(api: APIClient) {
@@ -135,8 +188,13 @@ struct TrafficView: View {
             }
             .onChange(of: showIncidents) { _, _ in Task { await refresh(force: true) } }
             .onChange(of: showWebcams) { _, _ in Task { await refresh(force: true) } }
+            .onChange(of: showRoads) { _, on in
+                if on { Task { await refresh(force: true) } } else { model.stopRoadsRetry() }
+            }
+            .onDisappear { model.stopRoadsRetry() }
             .sheet(item: $selectedIncident) { incident in IncidentSheet(incident: incident).presentationDetents([.medium]) }
             .sheet(item: $selectedWebcam) { webcam in WebcamSheet(webcam: webcam).presentationDetents([.medium, .large]) }
+            .sheet(item: $selectedRoad) { road in RoadSheet(road: road, attribution: model.roads?.attribution ?? "").presentationDetents([.medium]) }
             .alert("Not set up", isPresented: Binding(get: { hint != nil }, set: { if !$0 { hint = nil } })) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -150,6 +208,23 @@ struct TrafficView: View {
     private var map: some View {
         Map(position: $camera) {
             UserAnnotation()
+            if showRoads {
+                ForEach(shownRoads) { road in
+                    let line = road.geometry.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                    if road.ridden != true {
+                        MapPolyline(coordinates: line).stroke(Color.white, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
+                    }
+                    MapPolyline(coordinates: line)
+                        .stroke(RoadColors.color(score: road.score).opacity(road.ridden == true ? 0.4 : 1), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                }
+                ForEach(shownRoads) { road in
+                    if let mid = RoadsLogic.midpoint(road) {
+                        Annotation("", coordinate: CLLocationCoordinate2D(latitude: mid.lat, longitude: mid.lon), anchor: .center) {
+                            RoadBadge(road: road).onTapGesture { selectedRoad = road }
+                        }
+                    }
+                }
+            }
             if showIncidents {
                 ForEach(shownIncidents) { incident in
                     Annotation("", coordinate: CLLocationCoordinate2D(latitude: incident.lat, longitude: incident.lon), anchor: .center) {
@@ -187,6 +262,10 @@ struct TrafficView: View {
                 chip("Works", systemImage: "hammer.fill", isOn: $showWorks, available: true, layer: "works")
             }
             chip("Webcams", systemImage: "video.fill", isOn: $showWebcams, available: model.config?.webcams ?? false, layer: "webcams")
+            chip("Roads", systemImage: "arrow.triangle.turn.up.right.diamond.fill", isOn: $showRoads, available: true, layer: "roads")
+            if showRoads {
+                chip("New", systemImage: "sparkles", isOn: $onlyUnridden, available: true, layer: "unridden")
+            }
             Spacer(minLength: 0)
         }
     }
@@ -220,6 +299,8 @@ struct TrafficView: View {
         }
     }
 
+    private var shownRoads: [TwistyRoad] { RoadsLogic.visible(model.roads?.roads ?? [], onlyUnridden: onlyUnridden) }
+
     private var shownIncidents: [TrafficIncident] { TrafficLogic.visibleIncidents(model.incidents, showWorks: showWorks) }
 
     private var statusLines: [String] {
@@ -238,6 +319,16 @@ struct TrafficView: View {
                 lines.append(line)
             }
         }
+        if showRoads {
+            if model.roadsTooWide {
+                lines.append("Roads: zoom in to see twisty roads.")
+            } else if let error = model.roadsError {
+                lines.append("Roads: \(error)")
+            } else if let roads = model.roads {
+                lines.append(RoadsLogic.summary(roads, shown: shownRoads.count))
+                if roads.isBuilt { lines.append("Brighter violet is twistier, faded is ridden. Tap a badge for details. Roads © OpenStreetMap contributors.") }
+            }
+        }
         if showWebcams, model.config?.webcams == true {
             if let error = model.webcamsError { lines.append("Webcams: \(error)") } else { lines.append("Webcams nearby: \(model.webcams.count)") }
         }
@@ -245,6 +336,10 @@ struct TrafficView: View {
     }
 
     private func refresh(force: Bool) async {
+        if showRoads, let region = visible {
+            await model.refreshRoads(visible: RoadsLogic.box(centerLat: region.center.latitude, centerLon: region.center.longitude,
+                                                              latSpan: region.span.latitudeDelta, lonSpan: region.span.longitudeDelta), force: force)
+        }
         guard let region = visible else {
             // no map position yet (first launch): ask for the area around the default view
             await model.refresh(lat: 47.3769, lon: 8.5417, radiusKm: 15, incidents: showIncidents, webcams: showWebcams, force: force)
@@ -277,6 +372,33 @@ struct IncidentPin: View {
         case .roadworks: return Color(hex: 0xC9A227)
         case .other: return Theme.muted
         }
+    }
+}
+
+/// Twistiness as colour: light violet for lively roads, deep purple for twisty ones, magenta for the best. Not green, orange or red, which are the traffic.
+enum RoadColors {
+    static func color(score: Int) -> Color {
+        switch score {
+        case 85...: return Color(hex: 0xE040FB)
+        case 65..<85: return Color(hex: 0x9C5CF0)
+        default: return Color(hex: 0xB39DDB)
+        }
+    }
+}
+
+struct RoadBadge: View {
+    let road: TwistyRoad
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: road.ridden == true ? "checkmark" : "arrow.triangle.turn.up.right.diamond.fill").font(.system(size: 9, weight: .bold))
+            Text("\(road.score)").font(.system(size: 11, weight: .bold, design: .monospaced))
+        }
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .background(RoadColors.color(score: road.score).opacity(road.ridden == true ? 0.7 : 1), in: Capsule())
+        .overlay(Capsule().stroke(Color.white, lineWidth: 1.5))
+        .foregroundStyle(Color.white)
+        .accessibilityLabel("\(RoadsLogic.title(road)), \(RoadsLogic.scoreWord(road.score)), \(RoadsLogic.riddenText(road.ridden))")
     }
 }
 
@@ -371,6 +493,52 @@ struct WebcamSheet: View {
             }
             .background(Theme.bg.ignoresSafeArea())
             .navigationTitle("Webcam")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
+struct RoadSheet: View {
+    let road: TwistyRoad
+    let attribution: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        RoadBadge(road: road)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(RoadsLogic.title(road)).font(.headline).foregroundStyle(Theme.text)
+                            Text("\(RoadsLogic.scoreWord(road.score)) · \(RoadsLogic.lengthText(road.lengthM))").font(.subheadline).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    Label(RoadsLogic.riddenText(road.ridden), systemImage: road.ridden == true ? "checkmark.circle.fill" : "sparkles")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(road.ridden == false ? Theme.accent : Theme.text)
+                    HStack {
+                        StatTile(value: "\(road.score)", unit: "/ 100", label: "Twistiness")
+                        StatTile(value: RoadsLogic.lengthText(road.curvyM), label: "Of it bendy")
+                        StatTile(value: road.maxspeed.map { "\($0)" } ?? "-", unit: road.maxspeed == nil ? "" : "km/h", label: "Limit on map")
+                    }
+                    Text("\(RoadsLogic.highwayText(road.highway)), \(road.paved ? "paved" : "unpaved")" + (road.surface.map { " (\($0))" } ?? ""))
+                        .font(.footnote).foregroundStyle(Theme.muted)
+                    if let url = RoadsLogic.mapsURL(road) {
+                        Link(destination: url) {
+                            Label("Show in Apple Maps", systemImage: "map.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    Text("Twistiness is calculated from the shape of the road alone: how much of it is made of tight and medium bends. It knows nothing about the surface condition, traffic, speed cameras or whether the road is closed in winter. Check before you go.")
+                        .font(.caption).foregroundStyle(Theme.muted)
+                    if !attribution.isEmpty { Text(attribution).font(.caption2).foregroundStyle(Theme.muted) }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Theme.bg.ignoresSafeArea())
+            .navigationTitle("Road")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }

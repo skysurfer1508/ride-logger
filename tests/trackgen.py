@@ -97,3 +97,28 @@ def make_path_rows(segments, speed, pos_sigma=0.0, course_sigma=None, seed=1, st
             t += ds / speed
             emit()
     return rows
+
+
+def road_coords(parts, spacing=15.0, lat0=LAT0, lon0=LON0) -> list[tuple[float, float]]:
+    """The shape of a road as OpenStreetMap would hold it, a vertex every `spacing` metres, starting north from (lat0, lon0):
+
+        ("straight", metres)        ("turn", radius metres, degrees)      degrees > 0 turns right, < 0 turns left
+    """
+    import math
+    x = y = heading = 0.0
+    out = [(lat0, lon0)]
+    for seg in parts:
+        if seg[0] == "straight":
+            length, turn_rate = float(seg[1]), 0.0
+        else:
+            length = abs(math.radians(seg[2])) * seg[1]
+            turn_rate = math.radians(seg[2]) / length
+        steps = max(1, round(length / spacing))
+        ds = length / steps
+        for _ in range(steps):
+            heading += turn_rate * ds / 2
+            x += ds * math.sin(heading)
+            y += ds * math.cos(heading)
+            heading += turn_rate * ds / 2
+            out.append((lat0 + y / M_PER_DEG_LAT, lon0 + x / (M_PER_DEG_LAT * math.cos(math.radians(lat0)))))
+    return out
