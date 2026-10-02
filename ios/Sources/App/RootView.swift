@@ -77,7 +77,11 @@ struct MainTabs: View {
                     await recorder.uploader.syncAll()
                 }
                 Task { await GarageReminders.refresh(api: api) }
+                Task { await WatchBridge.shared.refreshStats(api: api) }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .ridesChanged)) { _ in
+            Task { await WatchBridge.shared.refreshStats(api: api) }
         }
     }
 }

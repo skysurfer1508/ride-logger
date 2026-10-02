@@ -44,6 +44,8 @@ struct MeResponse: Decodable {
 }
 
 struct HomeResponse: Decodable {
+    /// Kilometres ridden in the current week (the same week as the Overview's weekly chart). Nil from a server that does not say yet.
+    let weekKm: Double?
     let rideCount: Int
     let totalDistanceDisplay: String
     let avgSpeedDisplay: String

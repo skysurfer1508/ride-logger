@@ -246,6 +246,12 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
         RecordingLogic.snapshot(latest: latest, stats: stats, now: Date())
     }
 
+    /// The numbers the Lock Screen shows right now (the Apple Watch gets the same ones).
+    var liveSnapshot: LiveSnapshot { currentSnapshot() }
+
+    /// When the ride in progress started; nil when not recording.
+    var rideStartedAt: Date? { isRecording ? trip?.startedAt : nil }
+
     private func endTracking() {
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false

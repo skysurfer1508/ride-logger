@@ -71,6 +71,7 @@ def home(owner_sub: str = Depends(current_owner_sub)):
         "ride_count": context["ride_count"],
         "total_distance_display": context["total_distance_display"],
         "avg_speed_display": context["avg_speed_display"],
+        "week_km": context["week_km"],
         "latest": _summary_or_none(context["latest"]),
         "recent_routes": context["map_data"],
     })

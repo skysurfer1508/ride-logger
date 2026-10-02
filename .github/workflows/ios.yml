@@ -60,10 +60,34 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
 
+      # The Apple Watch app is a separate target that the iPhone app does not depend on, so it is built on its own: if it fails, the iPhone result above still
+      # stands, and the summary below says so.
+      - name: Build the Watch app
+        if: always()
+        continue-on-error: true
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project RideLog.xcodeproj \
+            -scheme RideLogWatch \
+            -destination "generic/platform=watchOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild-watch.log"
+
       - name: Summary of problems
         if: always()
         run: |
           {
+            echo "## Watch app build (separate from the iPhone app)"
+            if grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/xcodebuild-watch.log" 2>/dev/null; then
+              echo "The Watch app compiled."
+            else
+              echo "The Watch app did NOT compile (the iPhone app is not affected):"
+              echo '```'
+              grep -E "error:|\*\* BUILD FAILED" "$RUNNER_TEMP/xcodebuild-watch.log" 2>/dev/null | sort -u | head -40 || true
+              echo '```'
+            fi
             echo "## Compiler errors and failed tests"
             echo '```'
             grep -E "error:|\*\* (BUILD|TEST) FAILED|Test Case .* failed|XCTAssert" "$RUNNER_TEMP/xcodebuild.log" | sort -u | head -60 || true
@@ -79,5 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xcodebuild-log
-          path: ${{ runner.temp }}/xcodebuild.log
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/xcodebuild-watch.log
           retention-days: 7

@@ -62,6 +62,10 @@ def home_context(conn: sqlite3.Connection, owner_sub: str) -> dict:
         """,
         (owner_sub,),
     ).fetchone()
+    # the same week as the Overview's weekly chart (SQLite's %W: Monday first, UTC), for the Watch complication
+    week_m = conn.execute(
+        "SELECT COALESCE(SUM(distance_m), 0) FROM rides WHERE owner_sub = ? AND strftime('%Y-W%W', start_time) = strftime('%Y-W%W', 'now')", (owner_sub,)
+    ).fetchone()[0]
     map_rides = conn.execute(
         """
         SELECT id, start_time, polyline_simplified FROM rides
@@ -70,6 +74,7 @@ def home_context(conn: sqlite3.Connection, owner_sub: str) -> dict:
         (owner_sub, MAP_RIDES_ON_HOME),
     ).fetchall()
     return {
+        "week_km": round(week_m / 1000.0, 1),
         "latest": ride_view(latest) if latest else None,
         "ride_count": totals["ride_count"],
         "total_distance_display": f"{(totals['total_distance_m'] or 0) / 1000:,.0f}",

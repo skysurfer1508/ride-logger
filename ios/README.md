@@ -221,6 +221,35 @@ to Apple Maps).
   been built. Restart the server after pulling this version (new endpoint).
 - Not here yet: roads outside Switzerland.
 
+## Apple Watch: glance and start / stop from the wrist
+
+The Watch app is a **remote control and a display**: the iPhone stays the only recorder (GPS on the wrist would empty a Watch battery in a couple of hours), and
+the Watch shows what the phone sends.
+
+- **During a ride:** big speed, distance, a running timer and a Stop button (it asks to confirm). The phone sends the numbers once a second. If the phone goes quiet
+  (app killed, out of range) the Watch says "Waiting for iPhone..." and shows dashes instead of a frozen speed. A tap on the wrist when the ride starts and stops.
+- **Idle:** a Start button, kilometres this week and the last ride.
+- **Start from the wrist, with the phone locked in a bag:** the Watch asks the phone app to start. WatchConnectivity can wake the phone app in the background
+  when the Watch app is open, and the app then starts exactly as it does for the helmet Shortcut (same safety net: if the phone cannot start location from the
+  background you get the "tap to start" notification, and the Auto-start log in Settings records "watch" with what happened). Whether the background start
+  works with the phone locked is the same open question as for the helmet automation: it is proven only on your phone, so test it (below).
+- **Complication:** kilometres this week (circular, corner, inline) and last ride too (rectangular). Add it from the watch face editor.
+- **watchOS 11 and later also mirror the Lock Screen Live Activity** (speed and distance) to the Smart Stack by themselves, with nothing to set up: that is the
+  quickest way to a glanceable speed and does not need the Watch app at all.
+- What it does **not** do: record on its own, haptic turn-by-turn, heart rate or a workout session (adding a workout session would keep the Watch screen from
+  sleeping, and needs the HealthKit capability: left out so signing stays simple). The Watch's screen returns to the watch face after a while: iPhone Watch app > General > Return to Clock >
+  RideLog > "Return to App" for the longest time keeps it up while riding. The motion-sensor lean angle for a fixed mount was an optional experiment and is not built:
+  the GPS estimate (Lean and G-force) is the lean angle for now.
+
+**Installing it (once).** The iPhone app does not include the Watch app, on purpose: a problem in the Watch code cannot stop the iPhone app from building. So:
+1. `cd ios && xcodegen generate` (as always after a pull), open the project, and first run the **RideLog** scheme on the iPhone as usual.
+2. In Xcode choose the scheme **RideLogWatch** and, as the run destination, your paired Apple Watch (it appears under the iPhone). Press Run: Xcode puts the app on the
+   watch (the first time takes a while and asks for the watch passcode). Developer Mode must be on for the watch (Watch > Settings > Privacy & Security).
+3. Open RideLog on the Watch; it connects to the phone by itself. If Xcode complains about signing, set your team on the RideLogWatch and RideLogWatchWidgets targets
+   (Signing.local.xcconfig covers it the same way as for the iPhone targets). The complication shares data with the Watch app through the App Group
+   `group.com.skyserver1508.ridelogger.watch`; if your Apple ID cannot create it, the complication shows dashes and everything else still works.
+4. If the Watch build ever fails and you just want it gone, see the comment above the RideLogWatch block in `ios/project.yml`.
+
 ## Plan a ride: loops through twisty roads, A to B, follow on the Record tab
 
 Traffic tab > **Plan** (top left). Pan the map to where you want to start first: the start is the middle of the map that was showing.
@@ -309,6 +338,14 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 5. Replay: Play at 10x, then 1x and 30x; pause; drag the slider while it plays; turn Follow off and pan; Done. Leave the screen while playing: it stops.
 6. Airplane mode: a ride you opened before still opens (the stop labels as last seen).
 
+**Apple Watch**
+1. Open RideLog on the Watch with the phone nearby: the idle screen shows Start, "km this week" and the last ride (the numbers refresh when you open the phone app).
+2. Start from the wrist with the phone **in the app**: it starts recording, the Watch ticks, and shows speed, distance and the timer within a couple of seconds.
+3. The real test: phone **locked** in the bag, app closed. Start from the wrist. Did the phone start recording (blue indicator, Live Activity)? If not, did the
+   "tap to start" notification appear? Open Settings > Auto-start log and look for "watch": it says what happened. Tell Claude what you see.
+4. During a ride: is the speed on the wrist within a second or two of the phone? Walk away from the phone: "Waiting for iPhone..." should appear after about 12 seconds.
+5. Stop from the wrist: it asks, then the ride finishes and uploads. Add the complication to a watch face: it shows this week's km.
+
 **Planner**
 1. Traffic tab, pan to your street, Plan > Loop 80 km > Find loops: after a few seconds up to three loops appear on the little map and in the list, each starting and
    ending at your street. Are the lengths right? Do they use roads you would actually ride, or does one send you somewhere silly (motorway, farm track, closed pass)?
@@ -349,6 +386,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-A home-screen widget, Apple Watch (next), turn-by-turn navigation, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+A home-screen widget, turn-by-turn navigation, a Watch-only recorder, heart rate, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
 real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.

@@ -77,6 +77,20 @@ def test_home_for_a_new_user_is_empty_not_an_error(alice):
     assert data["ride_count"] == 0 and data["latest"] is None and data["recent_routes"] == []
 
 
+def test_home_says_how_far_you_rode_this_week_and_only_this_week(alice, bob):
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    add_ride(ALICE["sub"], now.isoformat(), distance_m=40_000)
+    add_ride(ALICE["sub"], (now - timedelta(days=21)).isoformat(), distance_m=90_000)
+    add_ride(BOB["sub"], now.isoformat(), distance_m=70_000)
+    assert alice.get("/api/v1/home").json()["week_km"] == 40.0
+    assert bob.get("/api/v1/home").json()["week_km"] == 70.0
+
+
+def test_a_new_user_has_ridden_nothing_this_week(alice):
+    assert alice.get("/api/v1/home").json()["week_km"] == 0.0
+
+
 def test_home_shows_only_my_rides(alice, bob):
     add_ride(ALICE["sub"], days_ago(2), distance_m=40_000)
     add_ride(ALICE["sub"], days_ago(1), distance_m=60_000)

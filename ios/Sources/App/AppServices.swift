@@ -25,7 +25,10 @@ final class AppServices {
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        Task { @MainActor in AppServices.shared.autoStart.applicationDidLaunch() }
+        Task { @MainActor in
+            AppServices.shared.autoStart.applicationDidLaunch()
+            WatchBridge.shared.activate(recorder: AppServices.shared.recorder)       // also on a background launch by the Watch
+        }
         return true
     }
 

@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "1.12"
-    CURRENT_PROJECT_VERSION: "13"
+    MARKETING_VERSION: "2.0"
+    CURRENT_PROJECT_VERSION: "14"
 targets:
   RideLog:
     type: application
@@ -77,6 +77,63 @@ targets:
         CFBundleDisplayName: RideLog
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+  RideLogWatch:
+    # The Apple Watch app (a remote control and a glanceable display; the iPhone stays the only recorder). Deliberately NOT a dependency of RideLog and not
+    # embedded in it: the iPhone app builds and runs without ever compiling this target, so a problem here cannot stop the iPhone app. To put it on the watch, pick
+    # the "RideLogWatch" scheme in Xcode, choose your paired Apple Watch as the run destination, and press Run (see ios/README.md). To remove the Watch support
+    # altogether: delete the RideLogWatch and RideLogWatchWidgets blocks, the RideLogWatch/ and RideLogWatchWidgets/ folders, and Sources/Watch/WatchBridge.swift
+    # with its two uses (AppServices.swift, RootView.swift). Shared/WatchProtocol.swift and its test can stay.
+    type: application
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - RideLogWatch
+      - path: Shared/WatchProtocol.swift
+    dependencies:
+      - target: RideLogWatchWidgets                    # the complication (embedded in the Watch app)
+    entitlements:
+      path: RideLogWatch/RideLogWatch.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.skyserver1508.ridelogger.watch   # how the complication reads what the Watch app received
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger.watchkitapp
+        PRODUCT_NAME: RideLogWatch
+        TARGETED_DEVICE_FAMILY: "4"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: RideLogWatch/Info.plist
+      properties:
+        CFBundleDisplayName: RideLog
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.skyserver1508.ridelogger
+        WKRunsIndependentlyOfCompanionApp: false
+  RideLogWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    deploymentTarget: "10.0"
+    sources:
+      - RideLogWatchWidgets
+      - path: Shared/WatchProtocol.swift
+    entitlements:
+      path: RideLogWatchWidgets/RideLogWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.skyserver1508.ridelogger.watch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.skyserver1508.ridelogger.watchkitapp.widgets
+        PRODUCT_NAME: RideLogWatchWidgets
+        TARGETED_DEVICE_FAMILY: "4"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: RideLogWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: RideLog
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
   RideLogTests:
     type: bundle.unit-test
     platform: iOS
@@ -100,6 +157,7 @@ targets:
       - Sources/API/PlannerModels.swift
       - Sources/Core/PlannerLogic.swift
       - Sources/Core/RouteFollow.swift
+      - Shared/WatchProtocol.swift
       - Sources/AutoStart/AutoStartLogic.swift
       - Sources/AutoStart/AutoStartLog.swift
       - Sources/Core/TrafficLogic.swift
