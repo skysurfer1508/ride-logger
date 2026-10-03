@@ -13,6 +13,7 @@ struct SettingsView: View {
     @ObservedObject private var speech = SpeechOutput.shared
     @AppStorage(VoiceSettings.enabledKey) private var voiceOn = true
     @AppStorage(VoiceSettings.rateKey) private var voiceRate = VoiceSettings.defaultRate
+    @AppStorage(VoiceSettings.boostKey) private var voiceBoost = 0.0
     @AppStorage(VoiceSettings.compatibilityKey) private var voiceCompat = false
     @AppStorage(VoiceSettings.engineKey) private var voiceEngine = VoiceEngine.natural.rawValue
     @AppStorage(VoiceSettings.identifierKey) private var voiceIdentifier = ""
@@ -168,6 +169,16 @@ struct SettingsView: View {
                 Text("Speed").font(.footnote).foregroundStyle(Theme.muted)
                 Slider(value: $voiceRate, in: VoiceSettings.rateRange).tint(Theme.accent).accessibilityLabel("Speaking speed")
             }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Loudness").font(.footnote).foregroundStyle(Theme.muted)
+                    Spacer()
+                    Text(VoiceSettings.boostLabel(voiceBoost)).font(.footnote.weight(.semibold)).foregroundStyle(Theme.text)
+                }
+                Slider(value: $voiceBoost, in: VoiceSettings.boostRange, step: VoiceSettings.boostStep).tint(Theme.accent).accessibilityLabel("Voice loudness boost")
+            }
+            Text("The voice cannot go past the volume of the phone or intercom, which is quiet next to music. This boosts it through an amplifier with a limiter, so it stays clear. Try +9 or +12, press Test voice, and set your intercom's own volume well up too.")
+                .font(.footnote).foregroundStyle(Theme.muted)
             Toggle("Say street names", isOn: $streetNames).tint(Theme.accent).foregroundStyle(Theme.text)
             Text("Street names are said by a German voice so that Swiss names sound right, and left out above 80 km/h.").font(.footnote).foregroundStyle(Theme.muted)
             Toggle("Intercom compatibility", isOn: $voiceCompat).tint(Theme.accent).foregroundStyle(Theme.text)

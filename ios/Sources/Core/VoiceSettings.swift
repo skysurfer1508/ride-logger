@@ -14,6 +14,7 @@ enum VoiceSettings {
     static let limitsKey = "voice.limits"
     static let hapticsKey = "voice.haptics"
     static let rerouteKey = "nav.reroute"
+    static let boostKey = "voice.boost"
 
     /// AVSpeechUtteranceDefaultSpeechRate.
     static let defaultRate = 0.5
@@ -58,6 +59,30 @@ enum VoiceSettings {
     /// True when the voice is going to the phone's own speaker or earpiece: probably not what a rider with an intercom wants.
     static func isPhoneSpeaker(_ outputs: [(name: String, type: String)]) -> Bool {
         !outputs.isEmpty && outputs.allSatisfy { $0.type == "Speaker" || $0.type == "Receiver" }
+    }
+
+    // MARK: loudness
+
+    /// How much louder than the system's own level the voice is made, in dB (0 = not at all: the voice is played the ordinary way). A player cannot go past full volume, so a boost
+    /// goes through an amplifier with a peak limiter in front of the output (see LoudSpeaker). Every 10 dB sounds about twice as loud; 12 dB is about what it takes to be heard
+    /// in a helmet at speed.
+    static let boostRange: ClosedRange<Double> = 0...18
+    static let boostStep = 3.0
+
+    static func clampedBoost(_ value: Double) -> Double {
+        let stepped = (min(max(value, boostRange.lowerBound), boostRange.upperBound) / boostStep).rounded() * boostStep
+        return min(max(stepped, boostRange.lowerBound), boostRange.upperBound)
+    }
+
+    static func boostDb(in defaults: UserDefaults = .standard) -> Double {
+        defaults.object(forKey: boostKey) == nil ? 0 : clampedBoost(defaults.double(forKey: boostKey))
+    }
+
+    /// "Normal" or "+9 dB, louder".
+    static func boostLabel(_ db: Double) -> String {
+        let value = clampedBoost(db)
+        if value <= 0 { return "Normal" }
+        return "+\(Int(value)) dB" + (value >= 15 ? ", loudest" : value >= 9 ? ", much louder" : ", louder")
     }
 
     // MARK: the new settings

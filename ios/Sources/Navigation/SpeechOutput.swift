@@ -16,10 +16,17 @@ final class SpeechOutput: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     private let session = AVAudioSession.sharedInstance()
     private var players: [AVAudioPlayer] = []
     private var clipQueueEnd: TimeInterval = 0
+    /// For a boosted voice (Settings > Voice guidance > Loudness): the amplifier, and a second synthesizer that only renders the phone's voice into audio for it.
+    private let loud = LoudSpeaker()
+    private let writer = AVSpeechSynthesizer()
+    private var waiting: [(phrase: Phrase, db: Double)] = []
+    private var rendering = false
+    private var generation = 0
 
     override init() {
         super.init()
         synthesizer.delegate = self
+        loud.onIdle = { [weak self] in self?.releaseIfIdle() }
     }
 
     var isEnabled: Bool { VoiceSettings.isEnabled() }
@@ -51,6 +58,12 @@ final class SpeechOutput: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
     func say(_ phrase: Phrase, force: Bool = false) {
         guard force || isEnabled, !phrase.parts.isEmpty else { return }
         configureSession()
+        let boost = VoiceSettings.boostDb()
+        if boost > 0 {
+            sayBoosted(phrase, db: boost)
+            lastRoute = currentRoute()
+            return
+        }
         if VoiceSettings.engine() == .natural, let files = VoiceClips.shared.files(for: phrase), playClips(files, parts: phrase.parts) {
             lastVoice = "natural voice"
         } else {
@@ -65,6 +78,10 @@ final class SpeechOutput: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
         players.forEach { $0.stop() }
         players = []
         clipQueueEnd = 0
+        generation += 1
+        waiting = []
+        rendering = false
+        loud.stop()
         release()
     }
 
@@ -115,24 +132,118 @@ final class SpeechOutput: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
             self.players.removeAll { $0 === player }
             if self.players.isEmpty {
                 self.clipQueueEnd = 0
-                if !self.synthesizer.isSpeaking { self.release() }
+                self.releaseIfIdle()
             }
         }
     }
 
     // MARK: the phone's own voice
 
+    private func makeUtterance(_ part: SpokenPart, english: AVSpeechSynthesisVoice?, german: AVSpeechSynthesisVoice?) -> AVSpeechUtterance {
+        let utterance = AVSpeechUtterance(string: part.text)
+        utterance.voice = part.kind == .street ? (german ?? english) : english
+        utterance.rate = Float(VoiceSettings.rate())
+        utterance.volume = 1
+        return utterance
+    }
+
     private func speakWithPhoneVoice(_ phrase: Phrase) {
         let english = Self.voice
         let german = Self.germanVoice
         for (i, part) in phrase.parts.enumerated() {
-            let utterance = AVSpeechUtterance(string: part.text)
-            utterance.voice = part.kind == .street ? (german ?? english) : english
-            utterance.rate = Float(VoiceSettings.rate())
-            utterance.volume = 1
+            let utterance = makeUtterance(part, english: english, german: german)
             utterance.preUtteranceDelay = i == 0 ? 0.05 : PhraseBook.pause(after: phrase.parts[i - 1], before: part)
             synthesizer.speak(utterance)
         }
+    }
+
+    // MARK: louder than a player can go
+
+    /// Says a phrase `db` louder: the natural voice's clips if all of them are on the phone, otherwise the phone's own voice rendered into audio first. Whatever goes wrong, the phrase
+    /// is still said the ordinary way.
+    private func sayBoosted(_ phrase: Phrase, db: Double) {
+        if VoiceSettings.engine() == .natural, let files = VoiceClips.shared.files(for: phrase), let pieces = clipPieces(files, parts: phrase.parts), loud.play(pieces, gainDb: Float(db)) {
+            lastVoice = "natural voice, \(VoiceSettings.boostLabel(db))"
+            return
+        }
+        waiting.append((phrase, db))
+        renderNext()
+    }
+
+    /// The clips as pieces of audio with the pauses between them; nil when one cannot be read.
+    private func clipPieces(_ files: [URL], parts: [SpokenPart]) -> [AVAudioPCMBuffer]? {
+        var pieces: [AVAudioPCMBuffer] = []
+        for (i, file) in files.enumerated() {
+            if i > 0, let gap = LoudSpeaker.silence(PhraseBook.pause(after: parts[i - 1], before: parts[i])) { pieces.append(gap) }
+            guard let piece = LoudSpeaker.piece(from: file) else { return nil }
+            pieces.append(piece)
+        }
+        return pieces
+    }
+
+    /// One phrase at a time is rendered, so that they are said in the order they came.
+    private func renderNext() {
+        guard !rendering, !waiting.isEmpty else { return }
+        rendering = true
+        let item = waiting.removeFirst()
+        let mine = generation
+        renderPhrase(item.phrase) { [weak self] pieces in
+            guard let self, mine == self.generation else { return }
+            self.rendering = false
+            if let pieces, self.loud.play(pieces, gainDb: Float(item.db)) {
+                self.lastVoice = "phone voice, \(VoiceSettings.boostLabel(item.db))"
+            } else {
+                self.speakWithPhoneVoice(item.phrase)
+                self.lastVoice = "phone voice"
+            }
+            self.renderNext()
+        }
+    }
+
+    /// The phone's voice saying the phrase, as pieces of audio (nil when it would not render within a few seconds).
+    private func renderPhrase(_ phrase: Phrase, done: @escaping @MainActor ([AVAudioPCMBuffer]?) -> Void) {
+        let english = Self.voice
+        let german = Self.germanVoice
+        var pieces: [AVAudioPCMBuffer] = []
+
+        func next(_ index: Int) {
+            guard index < phrase.parts.count else {
+                done(pieces.isEmpty ? nil : pieces)
+                return
+            }
+            let utterance = makeUtterance(phrase.parts[index], english: english, german: german)
+            let rendered = RenderedSpeech()
+
+            func finish() {
+                guard rendered.finish() else { return }
+                let chunks = rendered.all.compactMap { LoudSpeaker.converted($0) }
+                guard !chunks.isEmpty else {
+                    done(nil)
+                    return
+                }
+                if index > 0, let gap = LoudSpeaker.silence(PhraseBook.pause(after: phrase.parts[index - 1], before: phrase.parts[index])) { pieces.append(gap) }
+                pieces.append(contentsOf: chunks)
+                next(index + 1)
+            }
+
+            writer.write(utterance) { buffer in
+                guard let chunk = buffer as? AVAudioPCMBuffer else { return }
+                if chunk.frameLength == 0 {
+                    Task { @MainActor in finish() }
+                } else {
+                    rendered.add(chunk)
+                }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)                    // never wait for ever for a voice that does not render
+                finish()
+            }
+        }
+        next(0)
+    }
+
+    private func releaseIfIdle() {
+        if !synthesizer.isSpeaking && players.isEmpty && !loud.isBusy { release() }
     }
 
     // MARK: the audio session
@@ -158,7 +269,7 @@ final class SpeechOutput: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
-            if !self.synthesizer.isSpeaking && self.players.isEmpty { self.release() }
+            self.releaseIfIdle()
         }
     }
 }

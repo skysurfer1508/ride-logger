@@ -297,6 +297,11 @@ A phrase is only ever said by one voice: if any piece is missing the whole phras
 (installs Piper into the virtualenv and downloads two voice models, about 200 MB). **Settings > Voice guidance** has the voice choice (Natural / Phone voice), a picker for the phone voice (Premium and Enhanced ones
 first), *Say street names*, *Check the server's voice* and *Test voice* (which also says which voice said it).
 
+**Loudness.** The voice is quiet next to music because a player cannot go past full volume, and ducking the music does not make the voice louder. **Settings > Voice guidance > Loudness** (0 to +18 dB in
+steps of 3) runs the voice, natural or phone, through an amplifier with a peak limiter, so it gets louder without crackling. Try +9 or +12, press *Test voice*, and turn your intercom's own volume up too
+(the phone's volume buttons while music or the voice is playing, and the intercom's own). At 0 (default) nothing changes. If the boosted path ever fails to start, the phrase is said the ordinary way.
+The phone's voice has to be rendered into audio first when boosted, which adds a fraction of a second before it speaks.
+
 **Corner warnings.** The server finds sharp corners and hairpins from the route's own line (tuned on real routes: 0 to 3 on ordinary roads, 15 to 70 on an alpine pass). "Hairpin left", "Sharp right",
 and "slow to 40" only when you are well over the speed the corner is comfortable at; three or more close together are one "Curves ahead", and the following ones stay quiet unless you are far too fast. Never
 close before a turn instruction. Settings > Navigation > *Warn about sharp corners*.
@@ -447,8 +452,9 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 2. Simulate the drive on a twisty route (a pass): do you hear "Hairpin left", "Curves ahead"? Too many, too few, too early? Tell Claude the road.
 3. Ride with the limit sign on: does it match the signs? Is "Limit 50" said right after the sign, not before? Settings > Navigation can change or silence it.
 4. Take a wrong turn on purpose in a town at 30 to 40 km/h: how long until "Off route. Heading back to your route." and the new route (aim: a few seconds)? Is the way back sensible? Try *Ask me* and *Keep exploring* too.
-5. Start a route in the evening: is the sunset sentence right? On a rainy day: does "rain likely" come before the rain?
-6. Watch taps with the Watch app open on the wrist: can you tell left from right without looking?
+5. Settings > Voice guidance > Loudness: does +9 / +12 make the voice clearly louder in the helmet, without crackle? Is the delay before the phone voice speaks (boosted) acceptable?
+6. Start a route in the evening: is the sunset sentence right? On a rainy day: does "rain likely" come before the rain?
+7. Watch taps with the Watch app open on the wrist: can you tell left from right without looking?
 
 **Deleting**
 1. Rides: swipe a ride left, tap Delete, confirm. It disappears, and Home and Overview totals drop by that ride (the website too).

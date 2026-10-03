@@ -78,4 +78,34 @@ final class VoiceChoiceTests: XCTestCase {
         XCTAssertEqual(VoiceSettings.label(voice("x", "en-US", 3, name: "Zoe")), "Zoe (en-US, premium)")
         XCTAssertEqual(VoiceSettings.label(voice("x", "en-US", 1, name: "Fred")), "Fred (en-US, standard)")
     }
+
+    func testTheVoiceIsNotBoostedUntilSomeoneAsksForIt() throws {
+        let (d, cleanUp) = try defaults()
+        defer { cleanUp() }
+        XCTAssertEqual(VoiceSettings.boostDb(in: d), 0)
+        d.set(9.0, forKey: VoiceSettings.boostKey)
+        XCTAssertEqual(VoiceSettings.boostDb(in: d), 9)
+    }
+
+    func testTheBoostStaysInRangeAndInSteps() {
+        XCTAssertEqual(VoiceSettings.clampedBoost(-5), 0)
+        XCTAssertEqual(VoiceSettings.clampedBoost(40), 18)
+        XCTAssertEqual(VoiceSettings.clampedBoost(7.4), 6)
+        XCTAssertEqual(VoiceSettings.clampedBoost(7.6), 9)
+        XCTAssertEqual(VoiceSettings.clampedBoost(12), 12)
+    }
+
+    func testASavedBoostOutOfRangeIsBroughtBack() throws {
+        let (d, cleanUp) = try defaults()
+        defer { cleanUp() }
+        d.set(99.0, forKey: VoiceSettings.boostKey)
+        XCTAssertEqual(VoiceSettings.boostDb(in: d), 18)
+    }
+
+    func testTheBoostIsDescribedInWords() {
+        XCTAssertEqual(VoiceSettings.boostLabel(0), "Normal")
+        XCTAssertEqual(VoiceSettings.boostLabel(6), "+6 dB, louder")
+        XCTAssertEqual(VoiceSettings.boostLabel(12), "+12 dB, much louder")
+        XCTAssertEqual(VoiceSettings.boostLabel(18), "+18 dB, loudest")
+    }
 }
