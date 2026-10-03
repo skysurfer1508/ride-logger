@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     voice_enabled: bool = True
     voice_dir: str = "./data/voice"                       # rendered clips
     voice_models_dir: str = "./data/voice-models"         # <name>.onnx and <name>.onnx.json per voice
-    voice_en_model: str = "en_GB-alan-medium"             # the English voice (instructions, distances)
+    voice_en_model: str = "en_US-ryan-high"             # the English voice (instructions, distances)
     voice_de_model: str = "de_DE-thorsten-medium"         # the German voice (Swiss street names)
 
 

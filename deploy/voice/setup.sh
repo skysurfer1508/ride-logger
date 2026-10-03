@@ -5,7 +5,7 @@
 # Pick other voices with VOICE_EN_MODEL / VOICE_DE_MODEL in .env (names from https://huggingface.co/rhasspy/piper-voices) and run this again.
 set -eu
 cd "$(dirname "$0")/../.."
-EN="${VOICE_EN_MODEL:-$(sed -n 's/^VOICE_EN_MODEL=//p' .env 2>/dev/null | tail -1)}"; EN="${EN:-en_GB-alan-medium}"
+EN="${VOICE_EN_MODEL:-$(sed -n 's/^VOICE_EN_MODEL=//p' .env 2>/dev/null | tail -1)}"; EN="${EN:-en_US-ryan-high}"
 DE="${VOICE_DE_MODEL:-$(sed -n 's/^VOICE_DE_MODEL=//p' .env 2>/dev/null | tail -1)}"; DE="${DE:-de_DE-thorsten-medium}"
 DIR="data/voice-models"
 BASE="https://huggingface.co/rhasspy/piper-voices/resolve/main"
