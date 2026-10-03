@@ -3,6 +3,20 @@
  "message": null,
  "routes": [
   {
+   "corners": [
+    {
+     "advisory_kmh": 40,
+     "along_m": 5184,
+     "angle_deg": 49,
+     "dir": "right",
+     "kind": "sharp",
+     "lat": 47.416906,
+     "length_m": 90,
+     "lon": 8.545827,
+     "radius_m": 44,
+     "series": null
+    }
+   ],
    "distance_km": 29.7,
    "duration_min": 58,
    "maneuvers": [
@@ -3485,6 +3499,20 @@
    ]
   },
   {
+   "corners": [
+    {
+     "advisory_kmh": 40,
+     "along_m": 5184,
+     "angle_deg": 49,
+     "dir": "right",
+     "kind": "sharp",
+     "lat": 47.416906,
+     "length_m": 90,
+     "lon": 8.545827,
+     "radius_m": 44,
+     "series": null
+    }
+   ],
    "distance_km": 29.7,
    "duration_min": 58,
    "maneuvers": [

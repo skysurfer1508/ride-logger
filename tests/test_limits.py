@@ -339,3 +339,31 @@ def test_valhalla_errors_are_readable(monkeypatch):
     monkeypatch.setattr(valhalla.httpx, "post", boom)
     with pytest.raises(valhalla.ValhallaUnavailable, match="could not be reached"):
         valhalla.trace_attributes([(47.0, 8.0)])
+
+
+# ------------------------------------------------------------------------------------------------------------------------ limits along a route --
+
+def tagged(kmh):
+    return {"limit_kmh": kmh, "road_class": "secondary"}
+
+
+def test_a_route_gets_its_tagged_limits_as_change_points():
+    d = [i * 30.0 for i in range(100)]
+    m = [tagged(50)] * 40 + [tagged(80)] * 60
+    assert limits.route_limits(d, m) == [{"along_m": 0, "kmh": 50}, {"along_m": 1200, "kmh": 80}]
+
+
+def test_an_estimated_or_unmatched_stretch_has_no_limit_to_offer():
+    d = [i * 30.0 for i in range(60)]
+    m = [tagged(50)] * 20 + [{"limit_kmh": None, "road_class": "secondary"}] * 20 + [None] * 20
+    assert limits.route_limits(d, m) == [{"along_m": 0, "kmh": 50}, {"along_m": 600, "kmh": None}]
+
+
+def test_a_glitch_shorter_than_a_stretch_is_not_a_new_limit():
+    d = [i * 30.0 for i in range(100)]
+    m = [tagged(80)] * 40 + [tagged(30)] * 3 + [tagged(80)] * 57                       # 90 m of 30 at a junction
+    assert limits.route_limits(d, m) == [{"along_m": 0, "kmh": 80}]
+
+
+def test_no_points_no_limits():
+    assert limits.route_limits([], []) == []

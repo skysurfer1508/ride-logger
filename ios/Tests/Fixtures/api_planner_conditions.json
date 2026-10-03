@@ -1,0 +1,23 @@
+{
+ "alerts": [
+  {
+   "along_m": 0,
+   "kind": "rain",
+   "label": "rain likely"
+  }
+ ],
+ "api": 1,
+ "light": {
+  "dark_min": 20,
+  "dusk": "19:36",
+  "sunset": "19:06"
+ },
+ "message": null,
+ "status": "ok",
+ "summary": "Rain likely from the start. Sunset is at 19:06, about 20 minutes of this ride are after dark.",
+ "weather": {
+  "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
+  "temperature_max_c": 9,
+  "temperature_min_c": 9
+ }
+}

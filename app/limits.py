@@ -98,3 +98,30 @@ def _close(current: Optional[dict], stretches: list[dict]) -> None:
     if current is not None:
         stretches.append(current)
     return None
+
+
+MIN_RUN_M = 250.0               # a limit seen for less than this is a glitch of the matcher or a junction, not a new limit
+
+
+def route_limits(distances: Sequence[float], matches: Sequence[Optional[dict]]) -> list[dict]:
+    """The speed limit along a planned route as change points: [{"along_m", "kmh"}, ...], the first always at 0. `kmh` is the tagged limit, or None where the map
+    has none (or the stretch could not be matched): an estimated limit is never offered to the rider as fact. `distances[i]` is how far along point i is;
+    a stretch shorter than MIN_RUN_M is taken as part of the one before it."""
+    runs: list[list] = []
+    for along, match in zip(distances, matches):
+        limit, source = limit_for(match)
+        kmh = limit if source == "tagged" else None
+        if runs and runs[-1][1] == kmh:
+            continue
+        runs.append([along, kmh])
+    merged: list[list] = []
+    for i, (along, kmh) in enumerate(runs):
+        end = runs[i + 1][0] if i + 1 < len(runs) else distances[-1] if distances else along
+        if merged and end - along < MIN_RUN_M and i + 1 < len(runs):
+            continue
+        if merged and merged[-1][1] == kmh:
+            continue
+        merged.append([along, kmh])
+    if merged:
+        merged[0][0] = 0
+    return [{"along_m": round(a), "kmh": k} for a, k in merged]

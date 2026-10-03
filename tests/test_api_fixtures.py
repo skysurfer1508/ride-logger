@@ -21,6 +21,9 @@ from test_track import insert_points
 from trackgen import make_path_rows, make_rows
 
 FIXTURES = Path(__file__).resolve().parent.parent / "ios" / "Tests" / "Fixtures"
+from app import valhalla as _valhalla  # noqa: E402
+
+ALONG_SHAPE6 = _valhalla.encode_polyline6([(47.0 + i * 0.0003, 8.0) for i in range(300)])         # about 10 km north, for the limits and conditions answers
 ENDPOINTS = {
     "api_me": "/api/v1/me",
     "api_home": "/api/v1/home",
@@ -37,6 +40,8 @@ ENDPOINTS = {
     "api_planner_loop": ("/api/v1/planner/loop", {"lat": 47.3769, "lon": 8.5417, "distance_km": 60}),
     "api_planner_trip": ("/api/v1/planner/route", {"locations": json.dumps([{"lat": 47.3769, "lon": 8.5417}, {"lat": 47.4988, "lon": 8.7241}]), "mode": "fast", "alternatives": "1"}),
     "api_planner_directions": ("/api/v1/planner/directions", {"locations": json.dumps([{"lat": 47.3769, "lon": 8.5417, "type": "break"}, {"lat": 47.4988, "lon": 8.7241, "type": "break"}]), "mode": "relaxed"}),
+    "api_planner_limits": ("/api/v1/planner/limits", {"shape6": ALONG_SHAPE6}),
+    "api_planner_conditions": ("/api/v1/planner/conditions", {"shape6": ALONG_SHAPE6, "duration_min": 20, "tz": "Europe/Zurich"}),
     "api_planner_routes": "/api/v1/planner/routes",
     "api_planner_route": "/api/v1/planner/routes/{route_id}",
     "api_traffic_config": "/api/v1/traffic/config",
@@ -135,6 +140,10 @@ def test_fixture_matches_the_live_api(name, alice, seeded, monkeypatch):
         route_id = _planner_for_fixture(alice, monkeypatch)
     if name in ("api_planner_trip", "api_planner_directions"):
         _real_valhalla_for_fixture(monkeypatch)
+    if name == "api_planner_limits":
+        monkeypatch.setattr(_valhalla, "match_points", lambda pts: [{"limit_kmh": 50 if i < len(pts) // 2 else 80, "road_class": "secondary"} for i in range(len(pts))])
+    if name == "api_planner_conditions":
+        _forecast_for_fixture(monkeypatch)
     spec = ENDPOINTS[name]
     if isinstance(spec, tuple):
         response = alice.post(spec[0], data=spec[1], headers={"X-RideLog-Client": "1"})
@@ -190,6 +199,19 @@ def _planner_for_fixture(alice, monkeypatch):
                        headers={"X-RideLog-Client": "1"})
     assert saved.status_code == 200
     return saved.json()["route"]["id"]
+
+
+def _forecast_for_fixture(monkeypatch):
+    """A rainy forecast for the next few hours, so the conditions answer has an alert and a weather summary in it."""
+    import time
+    from app import conditions, weather
+    from app.config import settings
+    conditions._cache.clear()
+    monkeypatch.setattr(settings, "weather_enabled", True)
+    now = time.time()
+    hours = [datetime.fromtimestamp(now + h * 3600, timezone.utc).strftime("%Y-%m-%dT%H:00") for h in range(-1, 5)]
+    wet = {"time": hours, "temperature_2m": [9.0] * 6, "precipitation": [1.5] * 6, "wind_gusts_10m": [12.0] * 6, "weather_code": [63] * 6}
+    monkeypatch.setattr(weather, "fetch_many", lambda points, forecast_days=2: [wet] * len(points))
 
 
 def _real_valhalla_for_fixture(monkeypatch):

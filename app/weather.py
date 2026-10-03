@@ -66,6 +66,27 @@ def fetch(lat: float, lon: float, start: datetime, end: datetime, now: Optional[
     return _get(FORECAST_URL, {**params, "past_days": min(max(days_ago + 1, 1), MAX_PAST_DAYS), "forecast_days": 1})
 
 
+def fetch_many(points: list[tuple[float, float]], forecast_days: int = 2) -> list[dict]:
+    """The hourly forecast (UTC) for several places at once, in the order given: one request. Positions are rounded to 0.1 degree like `fetch`."""
+    params = {"latitude": ",".join(str(round(lat, 1)) for lat, _ in points), "longitude": ",".join(str(round(lon, 1)) for _, lon in points), "hourly": HOURLY,
+              "timezone": "UTC", "wind_speed_unit": "kmh", "forecast_days": forecast_days}
+    try:
+        response = httpx.get(FORECAST_URL, params=params, headers={"User-Agent": settings.osm_user_agent}, timeout=TIMEOUT_S)
+    except httpx.HTTPError as e:
+        raise WeatherUnavailable("The weather service could not be reached.") from e
+    if response.status_code != 200:
+        raise WeatherUnavailable(f"The weather service answered with an error ({response.status_code}).")
+    try:
+        data = response.json()
+    except ValueError as e:
+        raise WeatherUnavailable("The weather service sent something unreadable.") from e
+    places = data if isinstance(data, list) else [data]            # one place comes back as an object, several as a list
+    hourlies = [p.get("hourly") for p in places if isinstance(p, dict)]
+    if len(hourlies) != len(points) or not all(isinstance(h, dict) for h in hourlies):
+        raise WeatherUnavailable("The weather service had no data for those places.")
+    return hourlies
+
+
 def _hour(text: str) -> datetime:
     return datetime.fromisoformat(text).replace(tzinfo=timezone.utc)
 

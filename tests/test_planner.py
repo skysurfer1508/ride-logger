@@ -475,7 +475,7 @@ def test_planning_a_loop_over_the_api(alice, router):
     body = alice.post("/api/v1/planner/loop", data=LOOP, headers=CLIENT).json()
     assert body["status"] == "ok" and body["message"] is None and body["api"] == 1 and body["routes"] and body["roads_data"] is False
     route = body["routes"][0]
-    assert set(route) == {"name", "distance_km", "duration_min", "twisty_km", "twistiness", "retraced_pct", "new_pct", "shape", "mode", "waypoints", "shape6", "maneuvers"}
+    assert set(route) == {"name", "distance_km", "duration_min", "twisty_km", "twistiness", "retraced_pct", "new_pct", "shape", "mode", "waypoints", "shape6", "maneuvers", "corners"}
     assert route["shape"][0][0] == pytest.approx(LAT0, abs=1e-3)
 
 
@@ -674,3 +674,78 @@ def test_a_saved_route_remembers_the_stops_that_make_it_so_it_can_be_navigated_l
     plain = save(alice, name="No stops").json()["route"]
     assert alice.get(f"/api/v1/planner/routes/{plain['id']}").json()["route"]["waypoints"] is None and plain["mode"] is None
     assert save(alice, waypoints="nope").status_code == 400 and save(alice, mode="warp").status_code == 400
+
+
+# ------------------------------------------------------------------------------------------------------------------- along the route --
+
+def shape6_of(points):
+    return valhalla.encode_polyline6(points)
+
+
+def test_directions_carry_the_corners_of_the_route(alice, router):
+    twisty = road_coords([("straight", 200), ("turn", 15, 180), ("straight", 200)], spacing=8, lat0=LAT0, lon0=LON0)
+    router.same_shape = {"distance_m": 900.0, "duration_s": 100.0, "shape": twisty, "maneuvers": []}
+    body = alice.post("/api/v1/planner/directions", data={"locations": stops((LAT0, LON0), (LAT0 + 0.01, LON0)), "mode": "fast"}, headers=CLIENT).json()
+    route = body["routes"][0]
+    assert "corners" not in route                                            # no maneuvers, so no turn-by-turn data at all
+    router.same_shape = None
+    body = alice.post("/api/v1/planner/directions", data={"locations": stops((LAT0, LON0), (LAT0 + 0.1, LON0 + 0.05)), "mode": "fast"}, headers=CLIENT).json()
+    assert isinstance(body["routes"][0]["corners"], list)
+
+
+def test_the_limits_of_a_route_come_back_as_change_points(alice, router, monkeypatch):
+    line = [(LAT0 + i * 0.0003, LON0) for i in range(300)]                   # about 10 km north
+    monkeypatch.setattr(valhalla, "match_points", lambda pts: [{"limit_kmh": 50 if i < len(pts) // 2 else 80, "road_class": "secondary"} for i in range(len(pts))])
+    body = alice.post("/api/v1/planner/limits", data={"shape6": shape6_of(line)}, headers=CLIENT).json()
+    assert body["status"] == "ok" and [c["kmh"] for c in body["limits"]] == [50, 80] and body["limits"][0]["along_m"] == 0
+    assert 4000 < body["limits"][1]["along_m"] < 6000
+
+
+def test_limits_say_so_when_the_matcher_is_down_or_finds_nothing(alice, router, monkeypatch):
+    line = [(LAT0 + i * 0.0003, LON0) for i in range(300)]
+    monkeypatch.setattr(valhalla, "match_points", lambda pts: [None] * len(pts))
+    assert alice.post("/api/v1/planner/limits", data={"shape6": shape6_of(line)}, headers=CLIENT).json()["limits"] == []
+
+    def down(pts):
+        raise valhalla.ValhallaUnavailable("down")
+
+    monkeypatch.setattr(valhalla, "match_points", down)
+    assert alice.post("/api/v1/planner/limits", data={"shape6": shape6_of(line)}, headers=CLIENT).json()["status"] == "unavailable"
+
+
+def test_the_conditions_of_a_ride_include_the_light_and_the_forecast(alice, router, monkeypatch):
+    from app import conditions, weather
+    conditions._cache.clear()
+    monkeypatch.setattr(settings, "weather_enabled", True)
+    now = __import__("time").time()
+    hours = [__import__("datetime").datetime.fromtimestamp(now + h * 3600, __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:00") for h in range(-1, 5)]
+    wet = {"time": hours, "temperature_2m": [9.0] * 6, "precipitation": [1.5] * 6, "wind_gusts_10m": [12.0] * 6, "weather_code": [63] * 6}
+    monkeypatch.setattr(weather, "fetch_many", lambda points, forecast_days=2: [wet] * len(points))
+    line = [(LAT0 + i * 0.0003, LON0) for i in range(300)]
+    body = alice.post("/api/v1/planner/conditions", data={"shape6": shape6_of(line), "duration_min": 20, "tz": "Europe/Zurich"}, headers=CLIENT).json()
+    assert body["status"] == "ok" and body["alerts"][0]["kind"] == "rain" and body["alerts"][0]["along_m"] == 0
+    assert body["summary"].startswith("Rain likely from the start.") and set(body["light"]) == {"sunset", "dusk", "dark_min"}
+    assert body["weather"]["temperature_min_c"] == 9
+
+
+def test_conditions_still_come_without_a_forecast(alice, router):
+    line = [(LAT0 + i * 0.0003, LON0) for i in range(300)]
+    body = alice.post("/api/v1/planner/conditions", data={"shape6": shape6_of(line), "duration_min": 20}, headers=CLIENT).json()
+    assert body["status"] == "ok" and body["alerts"] == [] and body["weather"] is None
+
+
+@pytest.mark.parametrize("path,data", [("/api/v1/planner/limits", {"shape6": "???"}), ("/api/v1/planner/conditions", {"shape6": "???", "duration_min": 20})])
+def test_an_unreadable_line_is_refused(alice, router, path, data):
+    assert alice.post(path, data=data, headers=CLIENT).status_code == 400
+
+
+def test_a_forecast_for_a_departure_far_away_or_a_silly_duration_is_refused(alice, router):
+    line = shape6_of([(LAT0 + i * 0.0003, LON0) for i in range(300)])
+    assert alice.post("/api/v1/planner/conditions", data={"shape6": line, "duration_min": 20, "depart": 1}, headers=CLIENT).status_code == 400
+    assert alice.post("/api/v1/planner/conditions", data={"shape6": line, "duration_min": 0}, headers=CLIENT).status_code == 400
+
+
+def test_the_along_the_route_endpoints_need_a_login_and_the_client_header(alice, anon, router):
+    line = shape6_of([(LAT0 + i * 0.0003, LON0) for i in range(300)])
+    assert anon.post("/api/v1/planner/limits", data={"shape6": line}, headers=CLIENT).status_code == 401
+    assert alice.post("/api/v1/planner/limits", data={"shape6": line}).status_code in (400, 401, 403)

@@ -5,12 +5,15 @@ Planning answers with `status`: ok | unavailable (the routing service is off or 
 """
 import json
 import threading
+import time
+from datetime import datetime, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Response
 from fastapi.responses import JSONResponse
 
-from .. import curvature, geo, gpx, planner, roads, valhalla
+from .. import conditions, curvature, geo, gpx, limits, planner, roads, valhalla, weather
 from ..auth import current_owner_sub, require_api_client, require_api_login
 from ..db import get_db
 
@@ -144,6 +147,70 @@ def directions(locations: str = Form(), mode: str = Form("relaxed"), paved_only:
         return {"routes": [planner.present(route, planner.measure(route["shape"]), "Route", waypoints=stops, mode=mode)], "tried": 1}
 
     return _planning(work)
+
+
+# ------------------------------------------------------------------------------------------------------------------------ along the route --
+# What the rider is told on the way besides the turns. Asked for after navigation has started, so that a slow answer never holds up the first instruction.
+
+_info_slots = threading.BoundedSemaphore(2)
+LIMIT_STEP_M = 30.0
+MAX_LIMIT_POINTS = 6000
+
+
+def _line(shape6: str) -> list[tuple[float, float]]:
+    try:
+        line = valhalla.decode_polyline6(shape6)
+    except (IndexError, ValueError):
+        raise _bad("The route's line is not readable.")
+    if not 2 <= len(line) <= 60_000:
+        raise _bad("The route's line is not readable.")
+    return line
+
+
+@router.post("/limits", dependencies=CLIENT)
+def route_limits(shape6: str = Form()):
+    """The speed limits along a route (its polyline6 line): change points [{along_m, kmh}], `kmh` null where the map has no tagged limit."""
+    line = _line(shape6)
+    if not valhalla.configured():
+        return reply({"status": "unavailable", "limits": [], "message": "The routing service is switched off on your server."})
+    if not _info_slots.acquire(blocking=False):
+        return reply({"status": "unavailable", "limits": [], "message": "The server is busy. Try again in a few seconds."})
+    try:
+        total = curvature._cumulative(line)[-1]
+        points = curvature.resample(line, max(LIMIT_STEP_M, total / MAX_LIMIT_POINTS))
+        distances = curvature._cumulative(points)
+        matches = valhalla.match_points(points)
+    except valhalla.ValhallaUnavailable:
+        return reply({"status": "unavailable", "limits": [], "message": "The routing service is not answering right now."})
+    finally:
+        _info_slots.release()
+    return reply({"status": "ok", "message": None, "limits": limits.route_limits(distances, matches) if any(matches) else []})
+
+
+@router.post("/conditions", dependencies=CLIENT)
+def route_conditions(shape6: str = Form(), duration_min: float = Form(), depart: Optional[float] = Form(None), tz: str = Form("UTC")):
+    """What the ride will meet: alerts [{along_m, kind, label}] for rain, snow, storm, ice and wind where the forecast says so, the light (sunset, dusk, minutes after
+    dark) and one spoken `summary`. `depart` is the departure as epoch seconds (default now), `tz` the rider's time zone for the clock times."""
+    line = _line(shape6)
+    if not 1 <= duration_min <= 24 * 60:
+        raise _bad("The ride's duration is not plausible.")
+    now = time.time()
+    when = datetime.fromtimestamp(depart if depart is not None else now, timezone.utc)
+    if abs(when.timestamp() - now) > conditions.MAX_LOOKAHEAD_H * 3600:
+        raise _bad("The departure is too far from now for a forecast.")
+    try:
+        zone = ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        zone = ZoneInfo("UTC")
+    total = curvature._cumulative(line)[-1]
+    duration_s = duration_min * 60.0
+    mid = line[len(line) // 2]
+    lit = conditions.light(mid[0], mid[1], when, duration_s, zone)
+    samples = conditions.forecast(conditions.sample_points(line), when, duration_s, total)
+    found = conditions.alerts(samples)
+    span = conditions.temperature_range(samples)
+    return reply({"status": "ok", "message": None, "alerts": found, "light": lit, "summary": conditions.spoken_summary(found, lit),
+                  "weather": {"temperature_min_c": round(span[0]), "temperature_max_c": round(span[1]), "attribution": weather.ATTRIBUTION} if span else None})
 
 
 # ----------------------------------------------------------------------------------------------------------------------------- saved routes --

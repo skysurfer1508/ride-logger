@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from statistics import median
 from typing import Optional, Sequence
 
-from . import curvature, geo, roads, valhalla
+from . import corners, curvature, geo, roads, valhalla
 
 ROAD_FACTOR = 1.35               # a route between points is about this much longer than the straight line
 MIN_KM, MAX_KM = 20.0, 400.0
@@ -143,6 +143,7 @@ def present(route: dict, measured: dict, name: str, *, waypoints: Optional[list]
     if route.get("maneuvers"):
         out["shape6"] = valhalla.encode_polyline6(shape)
         out["maneuvers"] = route["maneuvers"]
+        out["corners"] = corners.find(shape, route["maneuvers"])
     return out
 
 

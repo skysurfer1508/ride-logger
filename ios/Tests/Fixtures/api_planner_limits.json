@@ -1,0 +1,15 @@
+{
+ "api": 1,
+ "limits": [
+  {
+   "along_m": 0,
+   "kmh": 50
+  },
+  {
+   "along_m": 4980,
+   "kmh": 80
+  }
+ ],
+ "message": null,
+ "status": "ok"
+}
