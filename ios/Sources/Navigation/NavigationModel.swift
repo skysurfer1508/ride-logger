@@ -1,6 +1,14 @@
 import CoreLocation
 import Foundation
 
+/// What is on offer when the rider has left the route and has chosen to be asked what to do (Settings > Navigation).
+struct RerouteOffer: Equatable {
+    let lat: Double
+    let lon: Double
+    let course: Double
+    let startedAt: Date
+}
+
 /// Turn-by-turn navigation along a planned route: follows the phone's position, speaks the turns, asks the server for a new route when the rider leaves the old one.
 /// It can run on its own location updates (also with the screen locked) or on a simulated ride, to hear the whole thing from the couch.
 @MainActor
@@ -14,6 +22,12 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
     @Published private(set) var simulatedPosition: CLLocationCoordinate2D?
     @Published private(set) var speedKmh = 0
     @Published private(set) var loading = false
+    /// When navigation began (for the elapsed time on the screen when no ride is being recorded).
+    @Published private(set) var startedAt: Date?
+    /// Set while the rider is off the route and is being asked what to do about it.
+    @Published private(set) var rerouteOffer: RerouteOffer?
+    /// True while the rider has chosen to explore: no rerouting for a few minutes.
+    @Published private(set) var exploring = false
     @Published var problem: String?
     @Published var muted = false {
         didSet { engine?.muted = muted }
@@ -28,6 +42,11 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
     private var simulationSpeed = 14.0
     private var simulationClock = 0.0
     private var lastFix: CLLocation?
+    private var offerTask: Task<Void, Never>?
+    private var extrasTask: Task<Void, Never>?
+    private var exploringUntil = Date.distantPast
+    /// How long the rider has to choose, and how long "keep exploring" lasts.
+    static let offerSeconds = 10.0, exploreSeconds = 180.0
 
     var coordinates: [CLLocationCoordinate2D] {
         guard let line = route?.line else { return [] }
@@ -52,7 +71,10 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
     func prepare(route planned: PlannedRoute, name: String, api: APIClient) async -> GuidanceRoute? {
         self.api = api
         problem = nil
-        if let ready = GuidanceRoute(route: planned, name: name) { return ready }
+        if let ready = GuidanceRoute(route: planned, name: name) {
+            prefetchVoice(for: ready)
+            return ready
+        }
         guard let waypoints = planned.waypoints, !waypoints.isEmpty else {
             problem = "This route has no turn-by-turn data. Plan it again to navigate it."
             return nil
@@ -88,6 +110,7 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
             let answer: PlanResponse = try await api.post("planner/directions", form: TripLogic.directionsForm(waypoints: waypoints, mode: mode))
             if let message = PlannerLogic.problem(answer) { problem = message; return nil }
             guard let planned = answer.routes.first, let ready = GuidanceRoute(route: planned, name: name) else { problem = "The server sent no turns for this route."; return nil }
+            prefetchVoice(for: ready)
             return ready
         } catch APIError.unauthorized {
             return nil
@@ -101,11 +124,16 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
     func start(_ ready: GuidanceRoute, record: Bool, simulate: Bool) async {
         stopEverything()
         route = ready
-        engine = GuidanceEngine(route: ready)
+        engine = GuidanceEngine(route: ready, options: VoiceSettings.guidanceOptions())
         engine?.muted = muted
+        startedAt = Date()
+        rerouteOffer = nil
+        exploring = false
         status = GuidanceStatus(alongM: 0, remainingM: ready.totalM, remainingS: ready.maneuvers.reduce(0) { $0 + $1.timeS }, nextIndex: nil, distanceToNextM: nil, isOffRoute: false)
         arrived = false
         isActive = true
+        prefetchVoice(for: ready)
+        loadExtras(for: ready, announce: true)
         if simulate {
             startSimulation()
         } else {
@@ -122,6 +150,11 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
         route = nil
         engine = nil
         arrived = false
+        startedAt = nil
+        offerTask?.cancel()
+        extrasTask?.cancel()
+        rerouteOffer = nil
+        exploring = false
         SpeechOutput.shared.stopAll()
     }
 
@@ -183,14 +216,17 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
 
     private func feed(lat: Double, lon: Double, speed: Double, now: Double, course: Double) {
         guard var current = engine else { return }
-        let outputs = current.update(lat: lat, lon: lon, speedMps: speed, now: now)
+        let outputs = current.update(lat: lat, lon: lon, speedMps: speed, now: now, course: course >= 0 ? course : nil)
         engine = current
         status = current.status
         speedKmh = Int((speed * 3.6).rounded())
+        if rerouteOffer != nil && !status.isOffRoute { dismissOffer() }
+        if exploring && (!status.isOffRoute || Date() >= exploringUntil) { stopExploring() }
         for output in outputs {
             switch output {
-            case .say(let text): SpeechOutput.shared.say(text)
-            case .needReroute: reroute(lat: lat, lon: lon, course: course)
+            case .say(let phrase): SpeechOutput.shared.say(phrase)
+            case .cue(let cue): if VoiceSettings.watchHaptics() { WatchBridge.shared.sendCue(cue) }
+            case .needReroute: offRoute(lat: lat, lon: lon, course: course)
             case .arrived: arrived = true
             }
         }
@@ -198,11 +234,64 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
 
     // MARK: rerouting
 
-    private func reroute(lat: Double, lon: Double, course: Double) {
+    /// The rider has been off the route for a few seconds: do what Settings says (or ask).
+    private func offRoute(lat: Double, lon: Double, course: Double) {
+        guard !rerouting, rerouteOffer == nil else { return }
+        switch VoiceSettings.rerouteChoice() {
+        case .rejoin: reroute(lat: lat, lon: lon, course: course, rejoin: true)
+        case .destination: reroute(lat: lat, lon: lon, course: course, rejoin: false)
+        case .ask:
+            let offer = RerouteOffer(lat: lat, lon: lon, course: course, startedAt: Date())
+            rerouteOffer = offer
+            offerTask?.cancel()
+            offerTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(Self.offerSeconds * 1_000_000_000))
+                guard !Task.isCancelled, let self, self.rerouteOffer == offer else { return }
+                self.choose(.rejoin)                                                // no answer: the way back onto the route
+            }
+        }
+    }
+
+    enum RerouteAnswer { case rejoin, destination, explore }
+
+    /// The rider's answer to the offer on the screen.
+    func choose(_ answer: RerouteAnswer) {
+        guard let offer = rerouteOffer else { return }
+        dismissOffer()
+        switch answer {
+        case .rejoin: reroute(lat: offer.lat, lon: offer.lon, course: offer.course, rejoin: true)
+        case .destination: reroute(lat: offer.lat, lon: offer.lon, course: offer.course, rejoin: false)
+        case .explore: startExploring()
+        }
+    }
+
+    private func dismissOffer() {
+        offerTask?.cancel()
+        rerouteOffer = nil
+    }
+
+    /// No rerouting for a few minutes (or until the rider is back on the route): for a detour on purpose.
+    func startExploring() {
+        exploring = true
+        exploringUntil = Date().addingTimeInterval(Self.exploreSeconds)
+        engine?.watchesOffRoute = false
+    }
+
+    func stopExploring() {
+        exploring = false
+        engine?.watchesOffRoute = true
+    }
+
+    private func reroute(lat: Double, lon: Double, course: Double, rejoin: Bool) {
         guard !rerouting, let route, let api else { return }
         rerouting = true
-        let ahead = RouteWaypoints.remaining(waypoints: route.waypoints, alongM: status.alongM, on: route.line, current: (lat, lon))
-        let waypoints = ahead.count >= 2 ? ahead : ahead + [RouteWaypoint(lat: route.line.lat.last ?? lat, lon: route.line.lon.last ?? lon)]
+        let waypoints: [RouteWaypoint]
+        if rejoin {
+            waypoints = RouteWaypoints.rejoin(waypoints: route.waypoints, alongM: status.alongM, on: route.line, current: (lat, lon))
+        } else {
+            let ahead = RouteWaypoints.remaining(waypoints: route.waypoints, alongM: status.alongM, on: route.line, current: (lat, lon))
+            waypoints = ahead.count >= 2 ? ahead : ahead + [RouteWaypoint(lat: route.line.lat.last ?? lat, lon: route.line.lon.last ?? lon)]
+        }
         let form = TripLogic.directionsForm(waypoints: waypoints, mode: route.mode, heading: course >= 0 ? course : nil)
         Task {
             defer { rerouting = false }
@@ -210,15 +299,47 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
                 let answer: PlanResponse = try await api.post("planner/directions", form: form)
                 guard isActive, let planned = answer.routes.first, let fresh = GuidanceRoute(route: planned, name: route.name) else { return }
                 self.route = fresh
-                var engine = GuidanceEngine(route: fresh, announceStart: false)
+                var engine = GuidanceEngine(route: fresh, announceStart: false, options: VoiceSettings.guidanceOptions())
                 engine.muted = muted
                 self.engine = engine
-                SpeechOutput.shared.say("Route updated.")
+                SpeechOutput.shared.say(GuidanceLines.routeUpdated)
+                prefetchVoice(for: fresh)
+                loadExtras(for: fresh, announce: false)
             } catch APIError.unauthorized {
                 // AuthService takes over
             } catch {
-                SpeechOutput.shared.say("No connection. Follow the blue line.")
+                SpeechOutput.shared.say(GuidanceLines.noConnection)
             }
+        }
+    }
+
+    // MARK: what the server knows about the route
+
+    /// Asks for the speed limits and the weather and light along the route, in the background: guidance does not wait for them, and speaks of them when they arrive.
+    private func loadExtras(for ready: GuidanceRoute, announce: Bool) {
+        guard let api, !ready.encodedLine.isEmpty else { return }
+        let minutes = max(1, Int((ready.maneuvers.reduce(0) { $0 + $1.timeS } / 60).rounded()))
+        extrasTask?.cancel()
+        extrasTask = Task { [weak self] in
+            async let limitsAnswer: LimitsResponse? = try? await api.post("planner/limits", form: ["shape6": ready.encodedLine])
+            async let conditionsAnswer: ConditionsResponse? = try? await api.post("planner/conditions", form: ["shape6": ready.encodedLine, "duration_min": String(minutes), "tz": TimeZone.current.identifier])
+            let limits = await limitsAnswer?.limits ?? []
+            let conditions = await conditionsAnswer
+            guard let self, !Task.isCancelled, self.isActive, self.route?.encodedLine == ready.encodedLine else { return }
+            let alerts = conditions?.alerts ?? []
+            let summary = announce ? conditions?.summary : nil
+            self.engine?.attach(limits: limits, alerts: alerts, summary: summary)
+            self.prefetchVoice(for: ready, limits: limits, alerts: alerts, summary: summary)
+        }
+    }
+
+    /// Makes sure the natural voice's clips for everything the guidance can say on this route are on the phone (a no-op when they are, or when the server has no such voice).
+    private func prefetchVoice(for ready: GuidanceRoute, limits: [LimitChange] = [], alerts: [RouteAlert] = [], summary: String? = nil) {
+        guard let api, VoiceSettings.engine() == .natural else { return }
+        let options = VoiceSettings.guidanceOptions()
+        Task.detached(priority: .utility) {
+            let parts = GuidancePreview.parts(for: ready, options: options, limits: limits, alerts: alerts, summary: summary)
+            await VoiceClips.shared.prefetch(parts, api: api)
         }
     }
 
@@ -231,7 +352,7 @@ final class NavigationModel: NSObject, ObservableObject, CLLocationManagerDelega
         simulator = DriveSimulator(line: route.line)
         simulationSpeed = speedKmh / 3.6
         simulationClock = Date().timeIntervalSince1970
-        engine = GuidanceEngine(route: route)
+        engine = GuidanceEngine(route: route, options: VoiceSettings.guidanceOptions())
         engine?.muted = muted
         arrived = false
         isSimulating = true

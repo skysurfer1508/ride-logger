@@ -288,6 +288,36 @@ navigate: plan it again and save the new one). *Record this ride too* (on by def
 - **Simulate the drive:** in the planner, *Simulate the drive* rides the route in the phone at 50 km/h (or 90, with *Skip 2 km*): you hear the whole sequence from the couch, see the banner and map move, and nothing is recorded.
 - Honest limits: the voice over an intercom and with the phone locked are proven only on your bike (that is what the checklist below is for); rerouting needs data; no offline maps; Valhalla's wording is good but not Google-grade.
 
+## Navigation 2.3: a natural voice, corner warnings, speed limits, weather, wrong turns
+
+**A natural voice (needs a one-time setup on the server).** The phone's own voice is the fallback; the better one is made by **Piper**, a local text-to-speech on your server (nothing is sent anywhere).
+When you plan or start a route the app asks the server for the pieces of speech the route needs ("In 300 meters", "turn left onto", the street name...), keeps them on the phone, and plays them with the
+same pauses and ducking as before, also with no signal. Street names are said as their own piece by a **German voice**, so "Hardstrasse" is not read in English; above 80 km/h they are left out.
+A phrase is only ever said by one voice: if any piece is missing the whole phrase goes to the phone voice. Setup on the server: `sh deploy/voice/setup.sh && sudo systemctl restart ride-logger`
+(installs Piper into the virtualenv and downloads two voice models, about 200 MB). **Settings > Voice guidance** has the voice choice (Natural / Phone voice), a picker for the phone voice (Premium and Enhanced ones
+first), *Say street names*, *Check the server's voice* and *Test voice* (which also says which voice said it).
+
+**Corner warnings.** The server finds sharp corners and hairpins from the route's own line (tuned on real routes: 0 to 3 on ordinary roads, 15 to 70 on an alpine pass). "Hairpin left", "Sharp right",
+and "slow to 40" only when you are well over the speed the corner is comfortable at; three or more close together are one "Curves ahead", and the following ones stay quiet unless you are far too fast. Never
+close before a turn instruction. Settings > Navigation > *Warn about sharp corners*.
+
+**Speed limit.** The limit sign next to your speed on the navigation screen (your speed turns red when you are over it), and "Limit 50" when it changes (or only when you are over, or never: Settings > Navigation).
+Only limits written on the map are used, never the guessed defaults.
+
+**Weather and light.** After you start, the server looks at the forecast along the route at the time you will get there: "Rain likely after 22 kilometers. Sunset is at 19:06, about 40 minutes of this ride are after dark."
+once, then "In 12 kilometers, rain likely" / snow / thunderstorm / "cold, 2 degrees, watch for ice" / strong gusts when you come near. Open-Meteo, no key.
+
+**Wrong turns and leaving the route.** A wrong turn is noticed in about **2 seconds** (more than 30 m from the route and heading more than 60 degrees away from it, at 15 km/h or more), instead of
+waiting until you are 100 m away. What happens then is Settings > Navigation > *When I leave the route*: **Take me back onto my route** (default: a way back that joins the planned route a kilometre ahead of where
+you left it and keeps to its roads), **New route to the destination**, or **Ask me** (big buttons on the screen: *Rejoin route*, *New route*, *Keep exploring*; no answer in 10 seconds takes the way back).
+*Keep exploring* switches rerouting off for 3 minutes or until you are back on the route.
+
+**Speed and elapsed time on the navigation screen.** Your speed is large, with the limit sign beside it, and the elapsed time counts from the start of the ride being recorded (or from the start of navigation).
+
+**Watch taps.** At a turn the Watch taps your wrist: two rising taps for left, two falling taps for right, one click for a corner, a retry for a U-turn. This only works while the Watch app is open and reachable
+(the phone sends it live; a cue older than 4 seconds is dropped). In the Watch's own settings set *Return to Clock* to *Return to App* so the app is still there. A workout session would keep it running with the
+screen off, but it needs the HealthKit capability, so it is left out for now (Settings > Navigation > *Tap the Apple Watch at turns* switches it off).
+
 ## GPX export and import
 
 - **Export:** open a ride and tap the share icon (top right). The file contains every stored point with time, elevation and speed, so Strava, Komoot, Apple
@@ -411,6 +441,15 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 4. Switch layers off and on; refresh button; airplane mode shows a readable message instead of a crash.
 5. Home > "Totals, records and weekly distance" opens the overview; tapping a record opens that ride.
 
+**Navigation 2.3**
+1. Settings > Voice guidance > *Test voice*: it says "In 300 meters, turn left onto Hardstrasse" and tells you which voice said it. Natural voice only appears after the server setup (`deploy/voice/setup.sh`) and a planned route
+   (or *Test voice*) has fetched its phrases. Is "Hardstrasse" said in German, with a small pause before it? Does it come through the intercom like before?
+2. Simulate the drive on a twisty route (a pass): do you hear "Hairpin left", "Curves ahead"? Too many, too few, too early? Tell Claude the road.
+3. Ride with the limit sign on: does it match the signs? Is "Limit 50" said right after the sign, not before? Settings > Navigation can change or silence it.
+4. Take a wrong turn on purpose in a town at 30 to 40 km/h: how long until "Off route. Heading back to your route." and the new route (aim: a few seconds)? Is the way back sensible? Try *Ask me* and *Keep exploring* too.
+5. Start a route in the evening: is the sunset sentence right? On a rainy day: does "rain likely" come before the rain?
+6. Watch taps with the Watch app open on the wrist: can you tell left from right without looking?
+
 **Deleting**
 1. Rides: swipe a ride left, tap Delete, confirm. It disappears, and Home and Overview totals drop by that ride (the website too).
 2. Open a ride, tap the trash icon, confirm: you land back on the list without it.
@@ -418,6 +457,6 @@ Overland and RideLog upload to the same place, so they can run side by side. Onc
 
 ## Not in the app (yet)
 
-A home-screen widget, turn-by-turn navigation, a Watch-only recorder, heart rate, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
+A home-screen widget, a Watch-only recorder, heart rate, a Stop button on the Lock Screen banner, deleting from the website, naming rides,
 real-time traffic-camera images (none are openly published for Zurich). Next rounds, once
 Start/Stop is proven on the road.

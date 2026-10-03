@@ -24,6 +24,7 @@ final class GuidanceEngineTests: XCTestCase {
     struct RideOutcome {
         var said: [(t: Int, text: String)] = []
         var reroutes: [Int] = []
+        var cues: [TurnCue] = []
         var arrived = false
         var texts: [String] { said.map(\.text) }
     }
@@ -52,7 +53,8 @@ final class GuidanceEngineTests: XCTestCase {
             let moving = along < stopAt ? speed : 0
             for output in engine.update(lat: position.lat, lon: position.lon, speedMps: moving, now: Double(t)) {
                 switch output {
-                case .say(let text): result.said.append((t, text))
+                case .say(let phrase): result.said.append((t, phrase.text))
+                case .cue(let cue): result.cues.append(cue)
                 case .needReroute: result.reroutes.append(t)
                 case .arrived: result.arrived = true
                 }
@@ -102,7 +104,7 @@ final class GuidanceEngineTests: XCTestCase {
         XCTAssertTrue(r.texts.contains("Your stop is ahead."))
         XCTAssertTrue(r.texts.contains("You will arrive at your destination."))
         XCTAssertGreaterThan(r.said.count, 20)
-        XCTAssertLessThan(r.said.count, 40)
+        XCTAssertLessThan(r.said.count, 45)
     }
 
     func testEachTurnIsSaidOnceAtTheNearDistanceAndNeverTwice() throws {
@@ -138,7 +140,7 @@ final class GuidanceEngineTests: XCTestCase {
         let slow = ride(try route(), speed: 14).texts
         let fast = ride(try route(), speed: 25).texts
         XCTAssertTrue(slow.contains("In 600 meters, turn right onto Schaffhauserplatz."))
-        XCTAssertTrue(fast.contains("In 1 kilometer, turn right onto Schaffhauserplatz."))
+        XCTAssertTrue(fast.contains("In 1 kilometer, turn right."))                         // above 80 km/h the street name is left out
     }
 
     // MARK: noise, gaps, standing still
@@ -163,7 +165,7 @@ final class GuidanceEngineTests: XCTestCase {
         var engine = GuidanceEngine(route: route)
         var said: [String] = []
         for t in 0..<120 {
-            for case .say(let text) in engine.update(lat: route.line.lat[0], lon: route.line.lon[0], speedMps: 0, now: Double(t)) { said.append(text) }
+            for case .say(let phrase) in engine.update(lat: route.line.lat[0], lon: route.line.lon[0], speedMps: 0, now: Double(t)) { said.append(phrase.text) }
         }
         XCTAssertEqual(said.count, 1)
         XCTAssertTrue(said[0].hasPrefix("Starting navigation."))

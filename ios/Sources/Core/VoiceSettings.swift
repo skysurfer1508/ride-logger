@@ -7,6 +7,14 @@ enum VoiceSettings {
     /// "Intercom compatibility": for a headset that only takes the call profile (lower quality, but it works).
     static let compatibilityKey = "voice.compat"
 
+    static let engineKey = "voice.engine"
+    static let identifierKey = "voice.identifier"
+    static let streetsKey = "voice.streets"
+    static let curvesKey = "voice.curves"
+    static let limitsKey = "voice.limits"
+    static let hapticsKey = "voice.haptics"
+    static let rerouteKey = "nav.reroute"
+
     /// AVSpeechUtteranceDefaultSpeechRate.
     static let defaultRate = 0.5
     static let rateRange: ClosedRange<Double> = 0.38...0.62
@@ -51,4 +59,114 @@ enum VoiceSettings {
     static func isPhoneSpeaker(_ outputs: [(name: String, type: String)]) -> Bool {
         !outputs.isEmpty && outputs.allSatisfy { $0.type == "Speaker" || $0.type == "Receiver" }
     }
+
+    // MARK: the new settings
+
+    static func engine(in defaults: UserDefaults = .standard) -> VoiceEngine {
+        VoiceEngine(rawValue: defaults.string(forKey: engineKey) ?? "") ?? .natural
+    }
+
+    static func streetNames(in defaults: UserDefaults = .standard) -> Bool { defaults.object(forKey: streetsKey) as? Bool ?? true }
+    static func curveWarnings(in defaults: UserDefaults = .standard) -> Bool { defaults.object(forKey: curvesKey) as? Bool ?? true }
+    static func watchHaptics(in defaults: UserDefaults = .standard) -> Bool { defaults.object(forKey: hapticsKey) as? Bool ?? true }
+
+    static func limitCallouts(in defaults: UserDefaults = .standard) -> LimitCallouts {
+        LimitCallouts(rawValue: defaults.string(forKey: limitsKey) ?? "") ?? .changes
+    }
+
+    static func rerouteChoice(in defaults: UserDefaults = .standard) -> RerouteChoice {
+        RerouteChoice(rawValue: defaults.string(forKey: rerouteKey) ?? "") ?? .rejoin
+    }
+
+    /// Everything the guidance engine is told about how to speak.
+    static func guidanceOptions(in defaults: UserDefaults = .standard) -> GuidanceOptions {
+        var options = GuidanceOptions()
+        options.streetNames = streetNames(in: defaults)
+        options.curveWarnings = curveWarnings(in: defaults)
+        options.limitCallouts = limitCallouts(in: defaults)
+        options.offRouteLine = rerouteChoice(in: defaults).offRouteLine
+        return options
+    }
+
+    // MARK: choosing a phone voice
+
+    /// An installed system voice, described without AVFoundation.
+    struct VoiceInfo: Equatable {
+        let identifier: String
+        let name: String
+        let language: String
+        /// 1 default, 2 enhanced, 3 premium.
+        let quality: Int
+    }
+
+    private static let englishOrder = ["en-GB", "en-US", "en-AU", "en-IE", "en-ZA", "en-IN"]
+    private static let germanOrder = ["de-CH", "de-DE", "de-AT"]
+
+    /// The voice to use for English: the one picked in Settings when it is still installed, otherwise the best quality, then the language order above.
+    static func pickEnglish(from voices: [VoiceInfo], identifier: String) -> VoiceInfo? {
+        let english = voices.filter { $0.language.hasPrefix("en") }
+        if !identifier.isEmpty, let chosen = english.first(where: { $0.identifier == identifier }) { return chosen }
+        return best(of: english, order: englishOrder)
+    }
+
+    /// The voice for street names: a Swiss German voice if there is one, then German, then Austrian; nil without any (the street is then read by the English voice).
+    static func pickGerman(from voices: [VoiceInfo]) -> VoiceInfo? {
+        best(of: voices.filter { $0.language.hasPrefix("de") }, order: germanOrder)
+    }
+
+    private static func best(of voices: [VoiceInfo], order: [String]) -> VoiceInfo? {
+        func rank(_ language: String) -> Int { order.firstIndex(of: language) ?? order.count }
+        return voices.min { a, b in
+            if a.quality != b.quality { return a.quality > b.quality }
+            if rank(a.language) != rank(b.language) { return rank(a.language) < rank(b.language) }
+            return a.name < b.name
+        }
+    }
+
+    /// "Daniel (en-GB, enhanced)" for the picker.
+    static func label(_ voice: VoiceInfo) -> String {
+        let quality = voice.quality >= 3 ? "premium" : voice.quality == 2 ? "enhanced" : "standard"
+        return "\(voice.name) (\(voice.language), \(quality))"
+    }
+}
+
+/// Where the voice comes from: the server's natural voice when its clips are on the phone, otherwise (or when chosen) the phone's own.
+enum VoiceEngine: String {
+    case natural, phone
+}
+
+/// When the speed limit is called out.
+enum LimitCallouts: String {
+    case off
+    /// Only when the rider is over the limit of the road they have just entered.
+    case whenOver
+    /// Whenever the limit changes.
+    case changes
+}
+
+/// What to do when the rider leaves the route.
+enum RerouteChoice: String {
+    /// Plan a way back onto the route and carry on along it.
+    case rejoin
+    /// Plan a new route from here to the destination.
+    case destination
+    /// Offer both on the screen (the default is taken after a few seconds).
+    case ask
+
+    var offRouteLine: String {
+        switch self {
+        case .rejoin: return GuidanceLines.offRouteBack
+        case .destination: return GuidanceLines.offRoute
+        case .ask: return GuidanceLines.offRouteAsk
+        }
+    }
+}
+
+/// How the guidance engine speaks (see GuidanceEngine).
+struct GuidanceOptions: Equatable {
+    var streetNames = true
+    var curveWarnings = true
+    var limitCallouts: LimitCallouts = .changes
+    /// What is said when the rider has been off the route for a few seconds.
+    var offRouteLine = GuidanceLines.offRoute
 }

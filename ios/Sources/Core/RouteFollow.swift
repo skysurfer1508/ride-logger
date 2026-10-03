@@ -80,6 +80,22 @@ enum RouteFollow {
         return result
     }
 
+    /// The direction the route runs in at segment `i`, in degrees clockwise from north (0 to 360).
+    static func bearing(on line: Line, segment i: Int) -> Double {
+        guard i >= 0, i < line.segmentCount else { return 0 }
+        let cosLat = cos(line.lat[i] * .pi / 180)
+        let east = (line.lon[i + 1] - line.lon[i]) * cosLat
+        let north = line.lat[i + 1] - line.lat[i]
+        let degrees = atan2(east, north) * 180 / .pi
+        return degrees < 0 ? degrees + 360 : degrees
+    }
+
+    /// The angle between two compass directions, 0 to 180.
+    static func angleBetween(_ a: Double, _ b: Double) -> Double {
+        let d = abs(a - b).truncatingRemainder(dividingBy: 360)
+        return d > 180 ? 360 - d : d
+    }
+
     /// Where the rider is on the route. `hint` is the segment from the last call: it keeps the answer moving forward along the route instead of jumping to
     /// another part that merely passes close by. If the rider is not near the line within that window, the whole route is searched (they have rejoined it elsewhere).
     static func progress(lat: Double, lon: Double, on line: Line, hint: Int? = nil) -> Progress {

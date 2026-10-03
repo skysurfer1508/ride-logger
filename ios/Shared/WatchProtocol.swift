@@ -9,12 +9,59 @@ enum WatchKeys {
     static let snapshot = "snapshot"
     /// In the application context from the phone: the totals for the idle screen and the complication.
     static let stats = "stats"
+    /// In a live message from the phone: a turn or a corner is close (a WatchCue's dictionary).
+    static let cue = "cue"
     /// In the phone's answer to a command.
     static let ok = "ok"
     static let text = "text"
     /// The phone asks "are you there?"; the watch answers with `pong`.
     static let ping = "ping"
     static let pong = "pong"
+}
+
+/// A tap on the wrist for a turn or a corner. Sent live and never queued: a late tap is worse than none.
+struct WatchCue: Equatable {
+    enum Kind: String, CaseIterable {
+        case left, right, uturn, curve, arrive
+    }
+
+    /// One tap of a pattern. The Watch cannot play Apple Maps' own left and right taps, so a turn is told by which kind of tap and how many.
+    enum Pulse: Equatable {
+        case up, down, click, retry, success
+    }
+
+    let kind: Kind
+    let sentAt: Date
+
+    /// A cue that arrives later than this is dropped: the turn is already behind the rider.
+    static let staleAfter: TimeInterval = 4
+    /// Time between the taps of a pattern.
+    static let pulseGap: TimeInterval = 0.25
+
+    /// Left is two rising taps, right two falling ones, a U-turn a retry, a corner one click, the arrival a success.
+    var pulses: [Pulse] {
+        switch kind {
+        case .left: return [.up, .up]
+        case .right: return [.down, .down]
+        case .uturn: return [.retry]
+        case .curve: return [.click]
+        case .arrive: return [.success]
+        }
+    }
+
+    func isStale(now: Date) -> Bool { now.timeIntervalSince(sentAt) > Self.staleAfter }
+
+    func dictionary() -> [String: Any] { ["kind": kind.rawValue, "sentAt": sentAt.timeIntervalSince1970] }
+
+    init(kind: Kind, sentAt: Date) {
+        self.kind = kind
+        self.sentAt = sentAt
+    }
+
+    init?(dictionary d: [String: Any]) {
+        guard let raw = d["kind"] as? String, let kind = Kind(rawValue: raw), let sent = (d["sentAt"] as? NSNumber)?.doubleValue else { return nil }
+        self.init(kind: kind, sentAt: Date(timeIntervalSince1970: sent))
+    }
 }
 
 enum WatchCommand: String {

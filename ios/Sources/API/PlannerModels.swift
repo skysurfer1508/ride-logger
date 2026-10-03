@@ -37,6 +37,8 @@ struct PlannedRoute: Decodable, Identifiable, Equatable {
     /// The route's full-resolution line, encoded (see Polyline6), and its turns: present when the route was asked for with directions.
     var shape6: String? = nil
     var maneuvers: [Maneuver]? = nil
+    /// The sharp corners and hairpins along the line, for warnings (with directions only).
+    var corners: [RouteCorner]? = nil
 
     var id: String { name }
 }
@@ -67,6 +69,66 @@ struct Maneuver: Decodable, Equatable {
     /// Which stretch between stops it belongs to (0 for the first).
     let leg: Int
     let roundaboutExit: Int?
+}
+
+/// A sharp corner or hairpin on a planned route (app/corners.py).
+struct RouteCorner: Decodable, Equatable {
+    /// Metres from the start of the route to where the corner begins.
+    let alongM: Double
+    let lat: Double
+    let lon: Double
+    /// "left" or "right".
+    let dir: String
+    /// "sharp" or "hairpin".
+    let kind: String
+    let radiusM: Double
+    let angleDeg: Double
+    let lengthM: Double
+    /// The speed a corner this tight is comfortably taken at, in km/h.
+    let advisoryKmh: Int
+    /// "start" for the first of three or more sharp corners close together, "in" for the others, nil for a corner on its own.
+    let series: String?
+}
+
+/// POST /api/v1/planner/limits: where the tagged speed limit of the route changes (`kmh` nil where the map has none).
+struct LimitChange: Decodable, Equatable {
+    let alongM: Double
+    let kmh: Int?
+}
+
+struct LimitsResponse: Decodable {
+    let status: String
+    let message: String?
+    let limits: [LimitChange]?
+}
+
+/// Rain, snow, storm, ice or strong gusts ahead (`kind`), told as "In 12 kilometers, <label>".
+struct RouteAlert: Decodable, Equatable {
+    let alongM: Double
+    let kind: String
+    let label: String
+}
+
+/// The evening of a planned ride: clock times in the rider's time zone.
+struct RouteLight: Decodable, Equatable {
+    let sunset: String?
+    let dusk: String?
+    let darkMin: Int
+}
+
+struct RouteWeather: Decodable, Equatable {
+    let temperatureMinC: Int
+    let temperatureMaxC: Int
+}
+
+/// POST /api/v1/planner/conditions: what the ride will meet, with one spoken `summary`.
+struct ConditionsResponse: Decodable {
+    let status: String
+    let message: String?
+    let alerts: [RouteAlert]?
+    let light: RouteLight?
+    let summary: String?
+    let weather: RouteWeather?
 }
 
 struct SavedRouteSummary: Decodable, Identifiable, Equatable {

@@ -5,6 +5,7 @@ import SwiftUI
 struct NavigationScreen: View {
     @ObservedObject var nav: NavigationModel
     @ObservedObject private var speech = SpeechOutput.shared
+    @ObservedObject private var recorder = AppServices.shared.recorder
     @State private var camera: MapCameraPosition = .userLocation(followsHeading: true, fallback: .automatic)
     @State private var confirmEnd = false
     @State private var simulatedKmh = 50.0
@@ -16,6 +17,7 @@ struct NavigationScreen: View {
             VStack(spacing: 0) {
                 banner
                 Spacer()
+                if let offer = nav.rerouteOffer { rerouteCard(offer) }
                 bottomBar
             }
         }
@@ -91,6 +93,12 @@ struct NavigationScreen: View {
                     .font(.footnote.weight(.bold)).foregroundStyle(Color.black)
                     .padding(.horizontal, 10).padding(.vertical, 4).background(Theme.accent, in: Capsule())
             }
+            if nav.exploring {
+                HStack(spacing: 10) {
+                    Label("Exploring: not rerouting", systemImage: "binoculars.fill").font(.footnote.weight(.bold)).foregroundStyle(Theme.accent)
+                    Button("Resume") { nav.stopExploring() }.buttonStyle(.bordered).font(.footnote.weight(.semibold))
+                }
+            }
             if nav.isSimulating {
                 Label("SIMULATION: nothing is recorded", systemImage: "play.circle.fill")
                     .font(.caption.weight(.bold)).foregroundStyle(Theme.accent)
@@ -111,20 +119,33 @@ struct NavigationScreen: View {
         VStack(spacing: 10) {
             if let problem = nav.problem { Text(problem).font(.footnote).foregroundStyle(Theme.accent) }
             if nav.isSimulating { simulationControls }
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(nav.speedKmh)").font(Theme.readout(56, weight: .bold)).foregroundStyle(isOverLimit ? Theme.danger : Theme.text)
+                    Text("KM/H").font(Theme.label).foregroundStyle(Theme.accent)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Speed \(nav.speedKmh) kilometres per hour")
+                if let limit = nav.status.limitKmh { limitSign(limit) }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
+                    if let start = elapsedStart {
+                        Text(timerInterval: start...Date.distantFuture, countsDown: false).font(Theme.readout(30, weight: .bold)).foregroundStyle(Theme.text).monospacedDigit()
+                    } else {
+                        Text("0:00").font(Theme.readout(30, weight: .bold)).foregroundStyle(Theme.text)
+                    }
+                    Text("ELAPSED").font(Theme.label).foregroundStyle(Theme.muted)
+                }
+            }
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(Format.km(fromMeters: nav.status.remainingM)).font(Theme.readout(30, weight: .bold))
                     Text("KM LEFT").font(Theme.label).foregroundStyle(Theme.muted)
                 }
                 Spacer()
-                VStack(spacing: 0) {
+                VStack(alignment: .trailing, spacing: 0) {
                     Text(Format.clock(seconds: nav.status.remainingS)).font(Theme.readout(30, weight: .bold))
                     Text("TIME · ARRIVE \(Format.time(Date().addingTimeInterval(nav.status.remainingS)))").font(Theme.label).foregroundStyle(Theme.muted)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text("\(nav.speedKmh)").font(Theme.readout(30, weight: .bold))
-                    Text("KM/H").font(Theme.label).foregroundStyle(Theme.accent)
                 }
             }
             .foregroundStyle(Theme.text)
@@ -144,6 +165,46 @@ struct NavigationScreen: View {
         }
         .padding(14)
         .background(Theme.bg.opacity(0.94), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+    }
+
+    /// Where the elapsed time counts from: the start of the ride being recorded, otherwise the start of navigation.
+    private var elapsedStart: Date? { (recorder.isRecording ? recorder.rideStartedAt : nil) ?? nav.startedAt }
+
+    /// Over the limit of the road, with a little allowance for the GPS speed jittering.
+    private var isOverLimit: Bool {
+        guard let limit = nav.status.limitKmh else { return false }
+        return nav.speedKmh > limit + 2
+    }
+
+    private func limitSign(_ kmh: Int) -> some View {
+        Text("\(kmh)").font(.system(size: 24, weight: .bold)).foregroundStyle(Color.black).minimumScaleFactor(0.7)
+            .frame(width: 54, height: 54)
+            .background(Circle().fill(Color.white))
+            .overlay(Circle().stroke(Color.red, lineWidth: 5))
+            .accessibilityLabel("Speed limit \(kmh)")
+    }
+
+    /// Asked when the rider has left the route and Settings says to ask: big buttons for gloves. No answer picks the way back onto the route.
+    private func rerouteCard(_ offer: RerouteOffer) -> some View {
+        VStack(spacing: 12) {
+            Text("You left the route").font(.title3.weight(.bold)).foregroundStyle(Theme.text)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let left = max(0, Int(NavigationModel.offerSeconds - context.date.timeIntervalSince(offer.startedAt)) + 1)
+                Text("Back onto your route in \(left) s unless you choose").font(.footnote).foregroundStyle(Theme.muted)
+            }
+            HStack(spacing: 10) {
+                Button { nav.choose(.rejoin) } label: { Text("Rejoin route").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14) }
+                    .buttonStyle(.borderedProminent).tint(Theme.accent)
+                Button { nav.choose(.destination) } label: { Text("New route").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14) }
+                    .buttonStyle(.bordered).tint(Theme.text)
+            }
+            Button { nav.choose(.explore) } label: { Label("Keep exploring", systemImage: "binoculars.fill").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 10) }
+                .buttonStyle(.bordered).tint(Theme.muted)
+        }
+        .padding(14)
+        .background(Theme.bg.opacity(0.96), in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
     }

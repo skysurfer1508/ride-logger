@@ -14,6 +14,15 @@ struct SettingsView: View {
     @AppStorage(VoiceSettings.enabledKey) private var voiceOn = true
     @AppStorage(VoiceSettings.rateKey) private var voiceRate = VoiceSettings.defaultRate
     @AppStorage(VoiceSettings.compatibilityKey) private var voiceCompat = false
+    @AppStorage(VoiceSettings.engineKey) private var voiceEngine = VoiceEngine.natural.rawValue
+    @AppStorage(VoiceSettings.identifierKey) private var voiceIdentifier = ""
+    @AppStorage(VoiceSettings.streetsKey) private var streetNames = true
+    @AppStorage(VoiceSettings.curvesKey) private var curveWarnings = true
+    @AppStorage(VoiceSettings.limitsKey) private var limitCallouts = LimitCallouts.changes.rawValue
+    @AppStorage(VoiceSettings.hapticsKey) private var watchHaptics = true
+    @AppStorage(VoiceSettings.rerouteKey) private var rerouteChoice = RerouteChoice.rejoin.rawValue
+    @ObservedObject private var clips = VoiceClips.shared
+    @State private var serverVoice = ""
     @State private var voiceRoute = ""
     @State private var localRides: [RideRecorder.LocalRide] = []
     @State private var deleteTarget: RideRecorder.LocalRide?
@@ -63,6 +72,7 @@ struct SettingsView: View {
                     recordingPanel
                     insightsPanel
                     voicePanel
+                    navigationPanel
                     watchPanel
                     AutoStartPanel(coordinator: autoStart, recorder: recorder)
                     dataPanel
@@ -136,16 +146,37 @@ struct SettingsView: View {
     private var voicePanel: some View {
         Panel(title: "Voice guidance") {
             Toggle("Speak the directions", isOn: $voiceOn).tint(Theme.accent).foregroundStyle(Theme.text)
+            Picker("Voice", selection: $voiceEngine) {
+                Text("Natural (from your server)").tag(VoiceEngine.natural.rawValue)
+                Text("Phone voice").tag(VoiceEngine.phone.rawValue)
+            }
+            .tint(Theme.accent)
+            Text(naturalVoiceNote).font(.footnote).foregroundStyle(Theme.muted)
+            Button {
+                Task { await checkServerVoice() }
+            } label: { Label("Check the server's voice", systemImage: "waveform") }
+                .buttonStyle(.bordered)
+            if !serverVoice.isEmpty { Text(serverVoice).font(.footnote).foregroundStyle(Theme.text) }
+            Picker("Phone voice", selection: $voiceIdentifier) {
+                Text("Automatic (best installed)").tag("")
+                ForEach(phoneVoices, id: \.identifier) { voice in Text(VoiceSettings.label(voice)).tag(voice.identifier) }
+            }
+            .tint(Theme.accent)
+            Text("Used when the natural voice is off or a phrase is not on the phone yet. Better voices can be downloaded in iPhone Settings > Accessibility > Spoken Content > Voices (choose Enhanced or Premium).")
+                .font(.caption2).foregroundStyle(Theme.muted)
             HStack {
                 Text("Speed").font(.footnote).foregroundStyle(Theme.muted)
                 Slider(value: $voiceRate, in: VoiceSettings.rateRange).tint(Theme.accent).accessibilityLabel("Speaking speed")
             }
+            Toggle("Say street names", isOn: $streetNames).tint(Theme.accent).foregroundStyle(Theme.text)
+            Text("Street names are said by a German voice so that Swiss names sound right, and left out above 80 km/h.").font(.footnote).foregroundStyle(Theme.muted)
             Toggle("Intercom compatibility", isOn: $voiceCompat).tint(Theme.accent).foregroundStyle(Theme.text)
             Text("Turn this on only if the voice does not come through your helmet intercom: it uses the call profile, which every headset understands, at lower sound quality.")
                 .font(.footnote).foregroundStyle(Theme.muted)
             Button {
-                speech.test()
                 Task {
+                    if VoiceSettings.engine() == .natural { await clips.prefetch(SpeechOutput.testPhrase().parts, api: api) }
+                    speech.test()
                     try? await Task.sleep(nanoseconds: 700_000_000)
                     voiceRoute = speech.currentRoute()
                 }
@@ -153,13 +184,59 @@ struct SettingsView: View {
                 .buttonStyle(.bordered)
             if !voiceRoute.isEmpty {
                 Text("The voice goes to: \(voiceRoute)").font(.footnote).foregroundStyle(Theme.text)
+                if !speech.lastVoice.isEmpty { Text("Said by the \(speech.lastVoice).").font(.footnote).foregroundStyle(Theme.text) }
                 if VoiceSettings.isPhoneSpeaker(speech.outputs()) {
                     Text("That is the phone itself, not your intercom. Connect the helmet in Bluetooth settings first; if it is connected, try Intercom compatibility.")
                         .font(.footnote).foregroundStyle(Theme.accent)
                 }
             }
-            Text("The best English voice installed is used. Better ones can be downloaded in iPhone Settings > Accessibility > Spoken Content > Voices.")
-                .font(.caption2).foregroundStyle(Theme.muted)
+        }
+    }
+
+    private var navigationPanel: some View {
+        Panel(title: "Navigation") {
+            Toggle("Warn about sharp corners", isOn: $curveWarnings).tint(Theme.accent).foregroundStyle(Theme.text)
+            Text("\"Hairpin left\", \"Sharp right\", \"Curves ahead\", and \"slow to 40\" when you are well over the speed the corner is comfortable at.").font(.footnote).foregroundStyle(Theme.muted)
+            Picker("Speed limit", selection: $limitCallouts) {
+                Text("Say it when it changes").tag(LimitCallouts.changes.rawValue)
+                Text("Only when I am over").tag(LimitCallouts.whenOver.rawValue)
+                Text("Never say it").tag(LimitCallouts.off.rawValue)
+            }
+            .tint(Theme.accent)
+            Text("Only limits written on the map are used, never guesses. The limit sign on the navigation screen follows the same rule.").font(.footnote).foregroundStyle(Theme.muted)
+            Picker("When I leave the route", selection: $rerouteChoice) {
+                Text("Take me back onto my route").tag(RerouteChoice.rejoin.rawValue)
+                Text("New route to the destination").tag(RerouteChoice.destination.rawValue)
+                Text("Ask me").tag(RerouteChoice.ask.rawValue)
+            }
+            .tint(Theme.accent)
+            Toggle("Tap the Apple Watch at turns", isOn: $watchHaptics).tint(Theme.accent).foregroundStyle(Theme.text)
+            Text("Two rising taps for left, two falling taps for right, one click for a corner. Only while the Watch app is open on the wrist: in the Watch's settings set Return to Clock to Return to App.")
+                .font(.footnote).foregroundStyle(Theme.muted)
+        }
+    }
+
+    /// The English voices installed, best first, for the picker.
+    private var phoneVoices: [VoiceSettings.VoiceInfo] {
+        SpeechOutput.installedVoices().filter { $0.language.hasPrefix("en") }.sorted { a, b in a.quality != b.quality ? a.quality > b.quality : a.name < b.name }
+    }
+
+    private var naturalVoiceNote: String {
+        if clips.serverReady == false { return "The natural voice is not set up on your server yet (see ios/README.md): the phone voice is used." }
+        return clips.count == 0 ? "Natural phrases are fetched from your server when you plan a route, then kept on the phone." : "\(clips.count) natural phrases are on this phone."
+    }
+
+    private func checkServerVoice() async {
+        serverVoice = "Asking the server…"
+        do {
+            let answer: VoiceStatusResponse = try await api.get("voice/status")
+            if answer.available {
+                serverVoice = "The server can speak with \(answer.voice)" + (answer.streetAvailable ? " and \(answer.streetVoice) for street names." : " (no German voice for street names).")
+            } else {
+                serverVoice = "The server's natural voice is not set up. The phone voice is used."
+            }
+        } catch {
+            serverVoice = (error as? LocalizedError)?.errorDescription ?? "The server did not answer."
         }
     }
 

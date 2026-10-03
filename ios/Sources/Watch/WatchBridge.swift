@@ -113,6 +113,14 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
         lastRecording = recording
     }
 
+    /// A tap on the wrist for a turn or a corner. Only while the Watch app is reachable: with the Watch screen asleep it may not be, and a cue that arrives late is worse than none.
+    func sendCue(_ cue: TurnCue) {
+        guard WCSession.isSupported(), let kind = WatchCue.Kind(rawValue: cue.rawValue) else { return }
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isPaired, session.isReachable else { return }
+        session.sendMessage([WatchKeys.cue: WatchCue(kind: kind, sentAt: Date()).dictionary()], replyHandler: nil, errorHandler: nil)
+    }
+
     private func pushContext(_ snapshot: WatchSnapshot) {
         var context: [String: Any] = [WatchKeys.snapshot: snapshot.dictionary()]
         if let stats { context[WatchKeys.stats] = stats.dictionary() }

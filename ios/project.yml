@@ -14,8 +14,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"          # Swift 5 language mode: no strict-concurrency errors on the first build
-    MARKETING_VERSION: "2.2"
-    CURRENT_PROJECT_VERSION: "16"
+    MARKETING_VERSION: "2.3"
+    CURRENT_PROJECT_VERSION: "17"
 targets:
   RideLog:
     type: application
@@ -161,6 +161,9 @@ targets:
       - Sources/Core/Polyline6.swift
       - Sources/Core/GuidanceEngine.swift
       - Sources/Core/VoiceSettings.swift
+      - Sources/Core/PhraseBook.swift
+      - Sources/Core/VoiceClipLogic.swift
+      - Sources/API/VoiceModels.swift
       - Sources/Core/TripLogic.swift
       - Shared/WatchProtocol.swift
       - Sources/AutoStart/AutoStartLogic.swift

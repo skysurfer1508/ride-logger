@@ -50,7 +50,28 @@ final class WatchSession: NSObject, ObservableObject {
         })
     }
 
+    /// Taps out a cue's pattern, unless it is stale.
+    private func buzz(_ cue: WatchCue) {
+        guard !cue.isStale(now: Date()) else { return }
+        let device = WKInterfaceDevice.current()
+        Task { @MainActor in
+            for (i, pulse) in cue.pulses.enumerated() {
+                if i > 0 { try? await Task.sleep(nanoseconds: UInt64(WatchCue.pulseGap * 1_000_000_000)) }
+                switch pulse {
+                case .up: device.play(.directionUp)
+                case .down: device.play(.directionDown)
+                case .click: device.play(.click)
+                case .retry: device.play(.retry)
+                case .success: device.play(.success)
+                }
+            }
+        }
+    }
+
     private func apply(_ payload: [String: Any]) {
+        if let dictionary = payload[WatchKeys.cue] as? [String: Any], let cue = WatchCue(dictionary: dictionary) {
+            buzz(cue)
+        }
         if let dictionary = payload[WatchKeys.snapshot] as? [String: Any], let new = WatchSnapshot(dictionary: dictionary) {
             if let old = snapshot, old.recording != new.recording {
                 WKInterfaceDevice.current().play(new.recording ? .start : .stop)
