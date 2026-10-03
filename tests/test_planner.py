@@ -749,3 +749,62 @@ def test_the_along_the_route_endpoints_need_a_login_and_the_client_header(alice,
     line = shape6_of([(LAT0 + i * 0.0003, LON0) for i in range(300)])
     assert anon.post("/api/v1/planner/limits", data={"shape6": line}, headers=CLIENT).status_code == 401
     assert alice.post("/api/v1/planner/limits", data={"shape6": line}).status_code in (400, 401, 403)
+
+
+# ------------------------------------------------------------------------------------------------- a short trip is not a long detour --
+
+def _route(shape, minutes):
+    return {"shape": shape, "duration_s": minutes * 60.0, "distance_m": sum(geo.haversine_m(a[0], a[1], b[0], b[1]) for a, b in zip(shape, shape[1:]))}
+
+
+def test_a_detour_that_is_mostly_an_out_and_back_is_not_a_route():
+    base = _route(wiggle(START, (LAT0 + 0.02, LON0), False), 10)
+    out_and_back = wiggle(START, (LAT0 + 0.1, LON0), True) + wiggle((LAT0 + 0.1, LON0), START, True)[1:]
+    assert planner.measure(out_and_back)["retraced_share"] > planner.MAX_RETRACED
+    assert not planner._worthwhile(_route(out_and_back, 40), base, 0.0, None)
+
+
+def test_doubling_back_and_little_twisty_road_for_the_time_rank_a_detour_lower_but_do_not_remove_it():
+    base = _route(wiggle(START, (LAT0 + 0.2, LON0), False), 20)
+    twisty = wiggle(START, (LAT0 + 0.2, LON0 + 0.02), True)
+    m = planner.measure(twisty)
+    clean = planner.twisty_quality(m, _route(twisty, 25), base, 0.0, False)
+    slow = planner.twisty_quality(m, _route(twisty, 20 + m["twisty_m"] / planner.GOOD_GAIN_M_PER_MIN * 3), base, 0.0, False)         # the same road for three times the time it is worth
+    doubling = planner.twisty_quality({**m, "retraced_share": 0.12}, _route(twisty, 25), base, 0.0, False)
+    assert clean > slow >= clean * 0.5 and doubling < clean * 0.6
+    assert planner._worthwhile(_route(twisty, 40), base, 0.0, None)
+
+
+def _item(q, minutes, cells, twisty_m=1000.0):
+    return (q, {"duration_s": minutes * 60.0}, {"cells": set(cells), "twisty_m": twisty_m})
+
+
+def test_the_options_are_the_best_of_each_length_of_detour_not_copies_of_the_best_loop():
+    near_copies = [_item(0.9 - i * 0.01, 60 + i, range(0, 100)) for i in range(5)]                 # six nearly the same long loop, all rated high
+    quick = _item(0.4, 15, range(200, 300))
+    medium = _item(0.5, 35, range(400, 500))
+    picked = planner._pick_options(near_copies + [quick, medium])
+    minutes = sorted(round(r["duration_s"] / 60) for _, r, _ in picked)
+    assert picked[0][0] == 0.9 and 15 in minutes and 35 in minutes and len([1 for _, r, _ in picked if r["duration_s"] >= 3600]) == 1
+
+
+def test_there_are_up_to_six_options_and_they_are_all_different():
+    items = [_item(0.5 + i * 0.01, 10 + i * 5, range(i * 100, i * 100 + 100)) for i in range(10)]
+    picked = planner._pick_options(items)
+    assert len(picked) == planner.TWISTY_ROUTES
+    assert [q for q, _, _ in picked] == sorted((q for q, _, _ in picked), reverse=True)
+    assert len({tuple(sorted(m["cells"]))[0] for _, _, m in picked}) == len(picked)
+
+
+def test_the_options_say_what_they_are_for():
+    picked = [_item(0.9, 60, [1], 8000.0), _item(0.6, 20, [2], 3000.0), _item(0.5, 45, [3], 12000.0), _item(0.4, 30, [4], 5000.0)]
+    assert planner._option_names(picked) == ["Twistiest", "Quickest twisty", "Most twisty road", "Option 2"]
+    assert planner._option_names([]) == []
+
+
+def test_a_trip_with_no_twisty_road_worth_it_says_it_is_the_relaxed_route(router, tmp_path, monkeypatch):
+    conn = roads.create(tmp_path / "roads.db")
+    roads.finish(conn, "test")                                                                              # a road database with nothing in it
+    monkeypatch.setattr(settings, "roads_db_path", str(tmp_path / "roads.db"))
+    out = planner.plan_trip(AB(), "twisty", detour_min=60, roads_conn=roads.connect())
+    assert out["routes"][0]["name"] == "Relaxed" and "no twisty roads worth a detour" in out["note"]

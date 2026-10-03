@@ -257,9 +257,13 @@ MODE_LABELS = {"ultra_fast": "Ultra fast", "fast": "Fast", "relaxed": "Relaxed",
 MAX_STOPS = 7                    # start, up to five stops in between, finish
 DEFAULT_DETOUR_MIN = 30
 MIN_DETOUR_MIN, MAX_DETOUR_MIN = 5, 180
-CORRIDOR_PER_MIN_M = 250.0       # a twisty stretch may lie this far off the direct route for each minute of detour allowed ...
+CORRIDOR_PER_MIN_M = 400.0       # a twisty stretch may lie this far off the direct route for each minute of detour allowed ...
 CORRIDOR_MIN_M, CORRIDOR_MAX_M = 2000.0, 15000.0          # ... between these limits
-TWISTY_CANDIDATES = 10
+MAX_RETRACED = 0.25              # a detour that goes back over more than this share of its own road is an out-and-back, not a route at all (measured: good ones 0 to 5%, weird ones 10 to 37%)
+RETRACE_PENALTY = 4.0            # below that, every share of retraced road costs this many times its size in rank
+GOOD_GAIN_M_PER_MIN = 200.0      # twisty road gained per extra minute that counts as full value (measured: poor detours 90 to 150, good ones 180 and up); less ranks lower, down to half
+TWISTY_ROUTES = 6                # options offered for a twisty trip (a loop gets MAX_ROUTES)
+TWISTY_CANDIDATES = 14
 TWISTY_MIN_SCORE = 55
 TIME_SLACK = 1.05
 STRETCH_SEPARATION_M = 3000.0
@@ -329,8 +333,9 @@ def _pinned(stops: list[dict], route: dict, every_m: float = 6000.0) -> list[dic
 
 def _plan_twisty(stops: list[dict], options: dict, detour_min: int, roads_conn, ridden: Optional[set], heading: Optional[float], prefer_new: bool) -> dict:
     """A to B through twisty stretches: the ordinary route between the stops is the baseline; twisty stretches from the road database that lie near it are tried as
-    detours (one or two of them, in the order they come along the way), kept if the trip takes at most `detour_min` longer, and the twistiest wins. Without stops in
-    between and without the road database it is the baseline, said so."""
+    detours (one or two of them, in the order they come along the way), kept if the trip takes at most `detour_min` longer and is a nice route (see _worthwhile).
+    Up to TWISTY_ROUTES different options come back, the best of each length of detour rather than six versions of the same loop, and the direct route last for
+    comparison. Without stops in between and without the road database it is the baseline, said so."""
     detour_min = max(MIN_DETOUR_MIN, min(MAX_DETOUR_MIN, int(detour_min)))
     base = _try(stops, True, True, costing_options=options)
     if base is None:
@@ -344,29 +349,104 @@ def _plan_twisty(stops: list[dict], options: dict, detour_min: int, roads_conn, 
     else:
         candidates = _twisty_candidates(stops, base, detour_min, roads_conn)
     budget_s = base["duration_s"] + detour_min * 60.0
-    results = [base]
+    detours: list[dict] = []
     if candidates:
         with ThreadPoolExecutor(max_workers=WORKERS) as pool:
             routed = list(pool.map(lambda locs: _try(locs, True, True, costing_options=options), candidates))
-        results += [r for r in routed if r and r["duration_s"] <= budget_s * TIME_SLACK]
-    scored = sorted(((quality(measure(r["shape"], ridden), r["distance_m"], None, prefer_new), r) for r in results), key=lambda item: -item[0])
-    chosen: list[tuple[float, dict, dict]] = []
-    for q, route in scored:
-        m = measure(route["shape"], ridden)
-        if all(_overlap(m["cells"], other[2]["cells"]) < DISTINCT_OVERLAP for other in chosen):
-            chosen.append((q, route, m))
-        if len(chosen) == MAX_ROUTES:
-            break
-    names = ["Twistiest", "Alternative", "Another option"]
+        base_twisty = measure(base["shape"], ridden)["twisty_m"]
+        detours = [r for r in routed if r and r["duration_s"] <= budget_s * TIME_SLACK and _worthwhile(r, base, base_twisty, ridden)]
+    if not detours and note is None:
+        note = "There are no twisty roads worth a detour near this trip, so this is the relaxed route."
+    base_m = measure(base["shape"], ridden)
+    measured = []
+    for r in detours:
+        m = measure(r["shape"], ridden)
+        measured.append((twisty_quality(m, r, base, base_m["twisty_m"], prefer_new), r, m))
+    picked = _pick_options(measured)
+    chosen = [(q, r, m, name) for (q, r, m), name in zip(picked, _option_names(picked))]
+    chosen.append((0.0, base, base_m, "Direct" if chosen else "Relaxed"))
     out = []
-    for i, (_, route, m) in enumerate(chosen):
+    for _, route, m, name in chosen:
         locations = route.get("locations", stops)
         guided = _try(locations, True, True, costing_options=options, directions=True, heading=heading) or route
-        out.append(present(guided, m, names[i] if len(chosen) > 1 or note is None else "Relaxed", waypoints=locations, mode="twisty"))
-    answer = {"routes": out, "tried": len(results)}
+        out.append(present(guided, m, name, waypoints=locations, mode="twisty"))
+    answer = {"routes": out, "tried": 1 + len(detours)}
+    if note is None and len(picked) < 3 and detour_min < MAX_DETOUR_MIN:
+        note = f"Only {len(picked)} twisty {'option fits' if len(picked) == 1 else 'options fit'} in {detour_min} extra minutes here. Allow a longer detour to see more."
     if note:
         answer["note"] = note
     return answer
+
+
+def _pick_options(measured: list[tuple[float, dict, dict]]) -> list[tuple[float, dict, dict]]:
+    """Up to TWISTY_ROUTES really different routes from the detours found: the best one first, then the best of each length of detour in turn (short, medium, long), so that
+    the choice is between a quick twisty detour and a long one and not between six near copies of the best loop. Best first in the end."""
+    ranked = sorted(measured, key=lambda item: -item[0])
+    picked: list[tuple[float, dict, dict]] = []
+
+    def distinct(item) -> bool:
+        return all(_overlap(item[2]["cells"], other[2]["cells"]) < DISTINCT_OVERLAP for other in picked)
+
+    for item in ranked:
+        if distinct(item):
+            picked.append(item)
+            break
+    by_time = sorted(ranked, key=lambda item: item[1]["duration_s"])
+    third = max(1, math.ceil(len(by_time) / 3))
+    buckets = [sorted(by_time[k:k + third], key=lambda item: -item[0]) for k in range(0, len(by_time), third)]
+    moved = True
+    while moved and len(picked) < TWISTY_ROUTES:
+        moved = False
+        for bucket in buckets:
+            while bucket:
+                item = bucket.pop(0)
+                if distinct(item):
+                    picked.append(item)
+                    moved = True
+                    break
+            if len(picked) == TWISTY_ROUTES:
+                break
+    return sorted(picked, key=lambda item: -item[0])
+
+
+def _option_names(picked: list[tuple[float, dict, dict]]) -> list[str]:
+    """Names that say what an option is for: the twistiest, the one with the most twisty road, the quickest; the rest are numbered."""
+    names: list[Optional[str]] = [None] * len(picked)
+    if not picked:
+        return []
+    names[0] = "Twistiest"
+    rest = list(range(1, len(picked)))
+    if rest:
+        most = max(rest, key=lambda i: picked[i][2]["twisty_m"])
+        if picked[most][2]["twisty_m"] > picked[0][2]["twisty_m"]:
+            names[most] = "Most twisty road"
+        quick = min((i for i in rest if names[i] is None), key=lambda i: picked[i][1]["duration_s"], default=None)
+        if quick is not None:
+            names[quick] = "Quickest twisty"
+    number = 2
+    for i, name in enumerate(names):
+        if name is None:
+            names[i] = f"Option {number}"
+            number += 1
+    return [n for n in names if n is not None]
+
+
+def _worthwhile(route: dict, base: dict, base_twisty_m: float, ridden: Optional[set]) -> bool:
+    """Is this detour a route at all and not an out-and-back: it must not go back over most of its own road. Everything short of that is ranked, not dropped, so that
+    there is always a choice."""
+    return measure(route["shape"], ridden)["retraced_share"] <= MAX_RETRACED
+
+
+def twisty_quality(m: dict, route: dict, base: dict, base_twisty_m: float, prefer_new: bool) -> float:
+    """How good a twisty detour is: how twisty it is, less a penalty for doubling back over its own road, less a penalty when the extra time buys little twisty road."""
+    q = m["twist_density"] * (1.0 - min(0.9, m["retraced_share"] * RETRACE_PENALTY))
+    extra_min = (route["duration_s"] - base["duration_s"]) / 60.0
+    if extra_min > 2.0:
+        gain = max(0.0, m["twisty_m"] - base_twisty_m) / extra_min
+        q *= 0.5 + 0.5 * min(1.0, gain / GOOD_GAIN_M_PER_MIN)
+    if prefer_new:
+        q *= 1.0 - 0.6 * m["ridden_share"]
+    return q
 
 
 def _twisty_candidates(stops: list[dict], base: dict, detour_min: int, conn) -> list[list[dict]]:
@@ -393,17 +473,18 @@ def _twisty_candidates(stops: list[dict], base: dict, detour_min: int, conn) -> 
         if len(chosen) == TWISTY_CANDIDATES:
             break
 
-    def through(item, previous):
+    def through(item, previous, reverse=False):
         line_ = item[2]["geometry"]
         ends = [(line_[0][0], line_[0][1]), (line_[-1][0], line_[-1][1])]
-        ends.sort(key=lambda e: geo.haversine_m(previous[0], previous[1], e[0], e[1]))
+        ends.sort(key=lambda e: geo.haversine_m(previous[0], previous[1], e[0], e[1]), reverse=reverse)
         return [{"lat": e[0], "lon": e[1], "type": "through"} for e in ends]
 
     start, end = stops[0], stops[-1]
     plans: list[list[dict]] = []
-    for item in chosen:                                                      # one stretch
+    for item in chosen:                                                      # one stretch, ridden in either direction
         plans.append([start, *through(item, (start["lat"], start["lon"])), end])
-    ordered = sorted(chosen[:6], key=lambda item: item[1])                  # two stretches, in the order they come along the way
+        plans.append([start, *through(item, (start["lat"], start["lon"]), reverse=True), end])
+    ordered = sorted(chosen[:7], key=lambda item: item[1])                  # two stretches, in the order they come along the way
     for i in range(len(ordered)):
         for j in range(i + 1, len(ordered)):
             if ordered[j][1] - ordered[i][1] < 30:                           # at least ~3 km apart along the way (samples are 100 m apart)
@@ -411,7 +492,7 @@ def _twisty_candidates(stops: list[dict], base: dict, detour_min: int, conn) -> 
             first = through(ordered[i], (start["lat"], start["lon"]))
             second = through(ordered[j], (first[-1]["lat"], first[-1]["lon"]))
             plans.append([start, *first, *second, end])
-    return plans[:16]
+    return plans[:30]
 
 
 def ridden_cells(conn, owner_sub: str, south: float, west: float, north: float, east: float) -> set:
