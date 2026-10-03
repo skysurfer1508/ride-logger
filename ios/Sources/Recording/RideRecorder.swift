@@ -28,6 +28,8 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var stats = LiveStats()
     @Published private(set) var latest: LocationSample?
+    /// The real time of the last fix kept (its sample's timestamp is rounded down to the second): speeds are worked out over the real time between fixes.
+    private var latestFixTime: Date?
     @Published private(set) var route: [CLLocationCoordinate2D] = []
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
@@ -128,6 +130,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
         trip = record
         stats = LiveStats()
         latest = nil
+        latestFixTime = nil
         route = []
         elapsed = 0
         beginTracking()
@@ -294,7 +297,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
             if let last = latest, stamp.timeIntervalSince(last.timestamp) < 1 { continue }   // one fix per second: unique timestamps on the wire
             let speed = RecordingLogic.trustedSpeed(
                 reported: location.speed, speedAccuracy: location.speedAccuracy, horizontalAccuracy: location.horizontalAccuracy,
-                latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, at: stamp, previous: latest)
+                latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, at: location.timestamp, previous: latest, previousTime: latestFixTime)
             let sample = LocationSample(
                 timestamp: stamp,
                 latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
@@ -310,6 +313,7 @@ final class RideRecorder: NSObject, ObservableObject, CLLocationManagerDelegate 
             }
             stats.add(sample)
             latest = sample
+            latestFixTime = location.timestamp
             onFix?(sample)
             route.append(location.coordinate)
         }

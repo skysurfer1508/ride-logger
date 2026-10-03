@@ -171,11 +171,15 @@ enum RecordingLogic {
     /// positions), and is the most precise thing there is, so it is used whenever it is valid and its stated accuracy is good. When it is missing
     /// (negative) or poor, in order: the speed between this fix and the previous one if both positions are accurate, else the previous speed carried
     /// on for a moment, else whatever was reported (0 if unknown). Never invents a speed from poor positions: that is worse than the poor reading.
+    ///
+    /// `time` and `previousTime` are the fixes' REAL times. A sample's own timestamp is rounded down to the second for the wire, so two fixes 1.99 s apart can look 1 s apart
+    /// (and 1.01 s apart look 2 s): working a speed out from those doubles or halves it for one fix, which is how a 70 km/h ride got a 134 km/h top speed. Without
+    /// `previousTime` (the first fix after the app was restarted mid-ride) the previous sample's rounded timestamp is all there is.
     static func trustedSpeed(reported: Double, speedAccuracy: Double, horizontalAccuracy: Double, latitude: Double, longitude: Double,
-                             at time: Date, previous: LocationSample?) -> Double {
+                             at time: Date, previous: LocationSample?, previousTime: Date? = nil) -> Double {
         if reported >= 0 && (speedAccuracy < 0 || speedAccuracy <= maxTrustedSpeedAccuracyMps) { return reported }
         if let previous {
-            let dt = time.timeIntervalSince(previous.timestamp)
+            let dt = time.timeIntervalSince(previousTime ?? previous.timestamp)
             if dt > 0 && dt <= maxDerivedGapS {
                 if horizontalAccuracy >= 0 && horizontalAccuracy <= goodPositionAccuracyM
                     && previous.horizontalAccuracy >= 0 && previous.horizontalAccuracy <= goodPositionAccuracyM {

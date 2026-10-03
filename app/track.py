@@ -76,6 +76,8 @@ def _fill_speeds(points: list[dict]) -> None:
         a, b = points[max(0, i - 1)], points[min(n - 1, i + 1)]
         dt = b["t"] - a["t"]
         p["mps"] = geo.haversine_m(a["lat"], a["lon"], b["lat"], b["lon"]) / dt if dt > 0 else 0.0
+    for p, smooth in zip(points, geo.despike([p["mps"] for p in points])):          # one-sample glitches would show as fake top speeds, braking and speeding
+        p["mps"] = smooth
 
 
 def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -202,12 +204,12 @@ def build_track(rows: Sequence) -> dict:
     top = None
     for i, p in enumerate(points):
         reported = p.get("speed")
-        if reported is not None and reported >= 0 and (top is None or reported > points[top]["speed"]):
+        if reported is not None and reported >= 0 and (top is None or p["mps"] > points[top]["mps"]):
             top = i
     max_speed = None
     if top is not None:
         tp = points[top]
-        max_speed = {"t": round(tp["t"], 1), "mps": round(tp["speed"], 1), "lat": round(tp["lat"], 6), "lon": round(tp["lon"], 6)}
+        max_speed = {"t": round(tp["t"], 1), "mps": round(tp["mps"], 1), "lat": round(tp["lat"], 6), "lon": round(tp["lon"], 6)}
 
     shown = _downsample(points, stops, top)
     return {

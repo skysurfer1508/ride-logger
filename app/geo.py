@@ -6,7 +6,7 @@ worth it on a disk-constrained host.
 """
 
 import math
-from typing import Sequence
+from typing import Optional, Sequence
 
 EARTH_RADIUS_M = 6371000.0
 
@@ -59,9 +59,29 @@ def total_distance_m(points: Sequence[dict]) -> float:
     )
 
 
+SPIKE_MPS = 5.0                 # a speed this far (18 km/h) from the mean of its two neighbours, ...
+SPIKE_NEIGHBOURS_MPS = 4.0      # ... when those two agree with each other within this much, is a measuring glitch, not riding: no bike gains 20 m/s in a second and loses it the next
+
+
+def despike(speeds: Sequence[Optional[float]]) -> list[Optional[float]]:
+    """The speeds with single-sample spikes (up or down) replaced by the mean of their neighbours. A speed worked out from two fixes is distance over the time between them;
+    when a fix's time is rounded to the second the two can be 1 s apart on the record and nearly 2 s apart in fact, which doubles that one speed (and the next one halves).
+    Real changes of speed last more than one sample, or the neighbours would not agree; they are left alone. None stays None."""
+    out = list(speeds)
+    for i in range(1, len(speeds) - 1):
+        s, a, b = speeds[i], speeds[i - 1], speeds[i + 1]
+        if s is None or a is None or b is None or abs(a - b) > SPIKE_NEIGHBOURS_MPS:
+            continue
+        mean = (a + b) / 2.0
+        if abs(s - mean) > SPIKE_MPS:
+            out[i] = mean
+    return out
+
+
 def max_speed_mps(points: Sequence[dict]) -> float:
-    speeds = [p["speed"] for p in points if p.get("speed") is not None and p["speed"] >= 0]
-    return max(speeds) if speeds else 0.0
+    speeds = despike([p["speed"] if p.get("speed") is not None and p["speed"] >= 0 else None for p in points])
+    valid = [s for s in speeds if s is not None]
+    return max(valid) if valid else 0.0
 
 
 def elevation_gain_m(points: Sequence[dict]) -> float:

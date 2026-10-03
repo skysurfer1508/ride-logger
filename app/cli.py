@@ -4,6 +4,10 @@
       Idempotently recomputes rides from raw points -- useful after tuning
       the segmentation/stat logic in processing.py or geo.py.
 
+  python -m app.cli recompute-max-speeds
+      Recomputes only each ride's top speed from its raw points (single-sample spikes are ignored, see geo.despike), without touching ride ids,
+      bikes or cached extras: the gentle alternative to `reprocess` after the top-speed rule changed.
+
   python -m app.cli sweep
       Finalize any stale open trips or gap-inferred rides that stopped
       receiving points and never got a chance to close (this only happens
@@ -80,6 +84,26 @@ def reprocess(since: str | None) -> None:
         print(f"Reprocessed. {count} rides now in the database.")
     finally:
         conn.close()
+
+
+def recompute_max_speeds() -> list[tuple[int, float, float]]:
+    """Fixes the stored top speed of every ride whose points say something else. Returns (ride id, old m/s, new m/s) for the ones changed."""
+    conn = get_db()
+    changed: list[tuple[int, float, float]] = []
+    try:
+        for ride in conn.execute("SELECT id, max_speed_mps FROM rides").fetchall():
+            rows = conn.execute("SELECT * FROM points WHERE ride_id = ? ORDER BY timestamp", (ride["id"],)).fetchall()
+            measured = processing._measure(rows)
+            if measured and abs(measured["max_speed"] - ride["max_speed_mps"]) > 0.05:
+                conn.execute("UPDATE rides SET max_speed_mps = ? WHERE id = ?", (measured["max_speed"], ride["id"]))
+                changed.append((ride["id"], ride["max_speed_mps"], measured["max_speed"]))
+        conn.commit()
+    finally:
+        conn.close()
+    for ride_id, old, new in changed:
+        print(f"ride {ride_id}: top speed {old * 3.6:.0f} km/h -> {new * 3.6:.0f} km/h")
+    print(f"{len(changed)} rides changed.")
+    return changed
 
 
 def sweep() -> None:
@@ -176,6 +200,7 @@ def main() -> None:
     reprocess_p = sub.add_parser("reprocess", help="Recompute rides from raw points")
     reprocess_p.add_argument("--since", help="ISO date; only reprocess points from this date on")
     sub.add_parser("sweep", help="Finalize stale open trips / gap-inferred rides")
+    sub.add_parser("recompute-max-speeds", help="Recompute each ride's top speed from its raw points (ignores one-sample spikes)")
     sub.add_parser("check-traffic", help="Call the Traffic tab's data sources once and show what came back")
     sub.add_parser("check-valhalla", help="Check the map-matching service and the weather service once")
     roads_p = sub.add_parser("build-roads", help="Build the twisty-road database from an OpenStreetMap extract (needs: pip install osmium)")
@@ -191,6 +216,8 @@ def main() -> None:
         reprocess(args.since)
     elif args.command == "sweep":
         sweep()
+    elif args.command == "recompute-max-speeds":
+        recompute_max_speeds()
     elif args.command == "check-traffic":
         check_traffic()
     elif args.command == "build-roads":

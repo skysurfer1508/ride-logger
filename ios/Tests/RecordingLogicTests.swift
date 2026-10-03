@@ -16,7 +16,7 @@ final class LiveStatsTests: XCTestCase {
     func testHaversineMatchesThePythonServer() {
         // app/geo.py haversine_m(47.3769, 8.5417, 47.3778, 8.5423)
         let d = Geo.haversineM(lat1: 47.3769, lon1: 8.5417, lat2: 47.3778, lon2: 8.5423)
-        XCTAssertEqual(d, 107.9, accuracy: 0.5)
+        XCTAssertEqual(d, 109.8, accuracy: 0.5)
     }
 
     func testAFixWithPoorAccuracyIsIgnoredLikeTheServerDoes() {
@@ -182,6 +182,24 @@ final class TrustedSpeedTests: XCTestCase {
 
     func testAnUnknownSpeedIsWorkedOutFromAccuratePositions() {
         XCTAssertEqual(trusted(reported: -1, speedAccuracy: -1, previous: makeSample(0, lat: 47.0, speed: 11, accuracy: 4)), 10.0, accuracy: 0.05)
+    }
+
+    func testTheSpeedIsWorkedOutOverTheRealTimeBetweenFixesNotTheRoundedStamps() {
+        // two fixes 1.99 s apart that are stamped 1 s apart (100.0 -> 100, 101.99 -> 101): 20 m in 1.99 s is 10 m/s, not 20
+        let previous = makeSample(0, lat: 47.0, speed: 11, accuracy: 4)
+        let real = previous.timestamp.addingTimeInterval(1.99)
+        let v = RecordingLogic.trustedSpeed(reported: -1, speedAccuracy: -1, horizontalAccuracy: 4, latitude: 47.00018, longitude: 8.0, at: real, previous: previous)
+        XCTAssertEqual(v, 20.0 / 1.99, accuracy: 0.05)
+        let stampedOnly = RecordingLogic.trustedSpeed(reported: -1, speedAccuracy: -1, horizontalAccuracy: 4, latitude: 47.00018, longitude: 8.0, at: makeSample(1).timestamp, previous: previous)
+        XCTAssertEqual(stampedOnly, 20.0, accuracy: 0.05)                                                            // what the rounded stamps used to give
+    }
+
+    func testThePreviousFixsRealTimeWinsOverItsRoundedStamp() {
+        // the previous fix was really at 0.9 s past its stamp, this one at 1.9 s past the next: 1 s apart, as the stamps say
+        let previous = makeSample(0, lat: 47.0, speed: 11, accuracy: 4)
+        let v = RecordingLogic.trustedSpeed(reported: -1, speedAccuracy: -1, horizontalAccuracy: 4, latitude: 47.00009, longitude: 8.0,
+                                            at: previous.timestamp.addingTimeInterval(2.0), previous: previous, previousTime: previous.timestamp.addingTimeInterval(0.9))
+        XCTAssertEqual(v, 10.0 / 1.1, accuracy: 0.05)
     }
 
     func testAGapTooLongToMeasureASpeedFallsBackToTheReportedOne() {
