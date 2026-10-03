@@ -38,5 +38,13 @@ class Settings(BaseSettings):
     opentransportdata_api_key: str = ""
     windy_api_key: str = ""
 
+    # The natural navigation voice (app/voice.py): Piper, a local neural text-to-speech, renders the spoken phrases to mp3 and the phone caches them. Not set up
+    # (no piper package or no model files) the app falls back to the phone's own voice. Set up with deploy/voice/setup.sh.
+    voice_enabled: bool = True
+    voice_dir: str = "./data/voice"                       # rendered clips
+    voice_models_dir: str = "./data/voice-models"         # <name>.onnx and <name>.onnx.json per voice
+    voice_en_model: str = "en_GB-alan-medium"             # the English voice (instructions, distances)
+    voice_de_model: str = "de_DE-thorsten-medium"         # the German voice (Swiss street names)
+
 
 settings = Settings()

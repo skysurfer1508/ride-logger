@@ -1,0 +1,2 @@
+# Optional: the natural navigation voice (app/voice.py). Install with deploy/voice/setup.sh, which also downloads the voice models.
+piper-tts
